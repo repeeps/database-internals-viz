@@ -1,0 +1,192 @@
+/* ============================================================
+   선형대수, 눈으로 보기 — 인터랙티브 시각화 공통 테마
+   "neural lab" dark aesthetic. 모든 챕터 페이지가 공유.
+   ============================================================ */
+@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap');
+
+:root{
+  --bg:#0b0e14; --panel:#121723; --panel-2:#161c2b; --line:#222a3d;
+  --ink:#e6ebf5; --muted:#8a95ad; --faint:#5a6478;
+  --q:#37bdf8;      /* cyan  - Query / 입력강조 */
+  --k:#fb7185;      /* coral - Key */
+  --v:#c084fc;      /* violet- Value / 임베딩 */
+  --hot:#fbbf24;    /* amber - 강조/초점 */
+  --good:#34d399;   /* green - 결과 */
+  --pink:#f472b6; --blue:#60a5fa; --slate:#94a3b8;
+  --drop:#fb7185; --dead:#fb7185;   /* coral 별칭 — 드롭/차단/에러 강조 */
+  --topic:#c084fc;  /* --v 별칭 */
+}
+*{box-sizing:border-box;}
+body{
+  margin:0; background:var(--bg); color:var(--ink);
+  font-family:'Pretendard',sans-serif; line-height:1.65;
+  background-image:
+    radial-gradient(circle at 15% -10%, rgba(55,189,248,.10), transparent 40%),
+    radial-gradient(circle at 90% 0%, rgba(192,132,252,.10), transparent 35%),
+    linear-gradient(rgba(255,255,255,.018) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.018) 1px, transparent 1px);
+  background-size:auto,auto,38px 38px,38px 38px;
+}
+.wrap{max-width:960px; margin:0 auto; padding:40px 24px 120px;}
+.mono{font-family:'JetBrains Mono',monospace;}
+
+/* ---- 상단 네비 (허브로 돌아가기 + 챕터 배지) ---- */
+.topnav{display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:30px; flex-wrap:wrap;}
+.topnav a.home{font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--muted); text-decoration:none;
+  padding:8px 13px; border:1px solid var(--line); border-radius:9px; background:var(--panel); transition:.2s;}
+.topnav a.home:hover{color:var(--ink); border-color:var(--q);}
+.topnav .chapbadge{font-family:'JetBrains Mono',monospace; font-size:12px; letter-spacing:.18em;
+  text-transform:uppercase; color:var(--q);}
+
+/* ---- 헤더 ---- */
+header .tag{font-family:'JetBrains Mono',monospace; font-size:12px; letter-spacing:.25em;
+  text-transform:uppercase; color:var(--q); margin-bottom:14px;}
+header h1{font-size:clamp(28px,5vw,46px); font-weight:800; letter-spacing:-.03em; margin:0 0 10px; line-height:1.1;
+  background:linear-gradient(100deg,#fff,#9bb6ff 60%,var(--q));
+  -webkit-background-clip:text; background-clip:text; color:transparent;}
+header p.intro{color:var(--muted); max-width:660px; font-size:16px;}
+header p.intro b{color:var(--hot);}
+
+/* ---- 스텝 내비 ---- */
+.stepper{display:flex; gap:8px; flex-wrap:wrap; margin:36px 0 24px; position:sticky; top:0; z-index:20;
+  padding:14px 0; background:linear-gradient(var(--bg) 70%, transparent); backdrop-filter:blur(2px);}
+.stepper button{font-family:'JetBrains Mono',monospace; font-size:12px; font-weight:700; padding:9px 14px;
+  border-radius:10px; border:1px solid var(--line); background:var(--panel); color:var(--muted); cursor:pointer; transition:.2s;}
+.stepper button:hover{border-color:var(--q); color:var(--ink);}
+.stepper button.active{background:var(--q); color:#04121f; border-color:var(--q); box-shadow:0 6px 20px rgba(55,189,248,.3);}
+
+/* ---- 패널 ---- */
+.panel{background:var(--panel); border:1px solid var(--line); border-radius:20px; padding:30px 28px;
+  margin-bottom:22px; display:none; animation:rise .45s ease both;}
+.panel.show{display:block;}
+@keyframes rise{from{opacity:0; transform:translateY(14px);}to{opacity:1; transform:none;}}
+.panel h2{margin:0 0 4px; font-size:22px; letter-spacing:-.02em;}
+.panel .lead{color:var(--muted); margin:0 0 22px; font-size:15px;}
+.panel .lead b{color:var(--hot);}
+.kicker{font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:.2em; text-transform:uppercase;}
+
+/* ---- 공통 텍스트/유틸 ---- */
+.note{font-size:13.5px; color:var(--muted); line-height:1.7;} .note b{color:var(--hot);}
+b.h{color:var(--hot);}
+.sub{font-weight:700; font-size:15px; margin:0 0 12px; color:var(--ink);}
+.row{display:flex; gap:14px; align-items:center; flex-wrap:wrap;}
+.op{font-size:22px; color:var(--faint); font-weight:700;}
+.arrow-v{text-align:center; font-size:1.4em; color:var(--faint); margin:14px 0;}
+.grid3{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:14px; margin-top:8px;}
+.card{background:var(--panel-2); border:1px solid var(--line); border-radius:14px; padding:16px;}
+.card h4{margin:0 0 10px; font-size:14px;}
+.label{font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--muted); margin-bottom:6px;}
+
+/* 설명 콜아웃 (개념 풀이용) */
+.callout{border-radius:14px; padding:18px 20px; margin:6px 0 24px; border:1px solid var(--line); background:var(--panel-2);}
+.callout.q{background:rgba(55,189,248,.06); border-color:rgba(55,189,248,.25);}
+.callout.v{background:rgba(192,132,252,.06); border-color:rgba(192,132,252,.25);}
+.callout.good{background:rgba(52,211,153,.06); border-color:rgba(52,211,153,.25);}
+.callout.k{background:rgba(251,113,133,.06); border-color:rgba(251,113,133,.25);}
+.callout .ttl{font-weight:800; font-size:16px; margin-bottom:8px;}
+.callout.q .ttl{color:var(--q);} .callout.v .ttl{color:var(--v);} .callout.good .ttl{color:var(--good);} .callout.k .ttl{color:var(--k);}
+.callout p{margin:0 0 10px; font-size:14px;} .callout p:last-child{margin-bottom:0;}
+.callout code{font-family:'JetBrains Mono',monospace; color:var(--q); font-size:13px;}
+.formula{font-family:'JetBrains Mono',monospace; font-size:14px; color:var(--ink); text-align:center;
+  padding:12px; border-radius:10px; background:var(--panel); border:1px dashed var(--line);}
+.formula sub{font-size:10px;} .formula sup{font-size:10px;}
+
+/* 벡터 칩 (작은 1D 벡터 표시) */
+.vec{display:inline-flex; gap:3px; padding:5px; border-radius:10px; background:var(--panel-2); border:1px solid var(--line);}
+.vec .n{font-family:'JetBrains Mono',monospace; font-size:12px; font-weight:700; color:#04121f;
+  min-width:46px; height:30px; display:flex; align-items:center; justify-content:center; border-radius:6px;}
+.vec.q .n{background:var(--q);} .vec.k .n{background:var(--k);} .vec.v .n{background:var(--v); color:#160a26;}
+.vec.neutral .n{background:#243049; color:#e6ebf5;}
+.tagchip{font-family:'JetBrains Mono',monospace; font-size:11px; padding:2px 8px; border-radius:6px; font-weight:700;}
+.tagchip.q{background:rgba(55,189,248,.15); color:var(--q);}
+.tagchip.k{background:rgba(251,113,133,.15); color:var(--k);}
+.tagchip.v{background:rgba(192,132,252,.15); color:var(--v);}
+
+/* ---- 토글 (단일 ⇄ 텐서 등) ---- */
+.view-toggle{display:inline-flex; gap:6px; margin:4px 0 20px; padding:4px; border-radius:11px;
+  background:var(--panel-2); border:1px solid var(--line);}
+.view-toggle button{font-family:'JetBrains Mono',monospace; font-size:12px; font-weight:700; padding:8px 14px;
+  border-radius:8px; border:none; background:transparent; color:var(--muted); cursor:pointer; transition:.2s;}
+.view-toggle button.on{background:var(--hot); color:#1a1304;}
+
+/* ============================================================
+   범용 행렬/텐서 렌더러 (lib.js의 mxMatrix가 생성하는 마크업)
+   ============================================================ */
+.mx-op-row{display:flex; gap:14px; align-items:center; flex-wrap:wrap; overflow-x:auto; padding:6px 2px 10px;}
+.mx{display:inline-flex; flex-direction:column; gap:7px; align-items:center;}
+.mx-title{font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--muted);}
+.mx-body{display:flex; gap:7px; align-items:flex-start;}
+.mx-rowlabs{display:flex; flex-direction:column; gap:5px;}
+.mx-rowlabs.head-pad{padding-top:17px;}
+.mx-rowlab{height:34px; display:flex; align-items:center; justify-content:flex-end; font-size:13px; font-weight:700;
+  color:var(--ink); padding-right:4px; white-space:nowrap;}
+.mx-rowlab small{color:var(--hot); font-weight:400; font-size:11px; margin-left:3px;}
+.mx-colwrap{display:flex; flex-direction:column; gap:5px;}
+.mx-colhead{display:grid; gap:5px;}
+.mx-colhead .h{font-size:9px; color:var(--muted); text-align:center; height:12px; font-family:'JetBrains Mono',monospace;}
+.mx-bracket{position:relative; padding:5px 11px;}
+.mx-bracket::before,.mx-bracket::after{content:''; position:absolute; top:0; bottom:0; width:8px; border:2.5px solid var(--acc,var(--line));}
+.mx-bracket::before{left:0; border-right:none; border-radius:5px 0 0 5px;}
+.mx-bracket::after{right:0; border-left:none; border-radius:0 5px 5px 0;}
+.mx-grid{display:grid; gap:5px;}
+.mx-cell{width:50px; height:34px; display:flex; align-items:center; justify-content:center; border-radius:5px;
+  font-family:'JetBrains Mono',monospace; font-size:12px; font-weight:700; background:var(--panel-2); border:1px solid var(--line); color:var(--ink);}
+.mx-cell.hl{background:rgba(251,191,36,.16); border-color:var(--hot); color:var(--hot);}
+.mx-cell.hl2{background:rgba(55,189,248,.16); border-color:var(--q); color:var(--q);}
+.mx-cell.zero{color:var(--faint);}
+.mx-shape{font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--acc,var(--muted)); font-weight:700;}
+.mx-bigop{font-size:22px; color:var(--faint); font-weight:700; flex:none;}
+.mx-note{font-size:13.5px; color:var(--muted); margin-top:16px; line-height:1.7;} .mx-note b{color:var(--hot);}
+.mx-flowtag{display:inline-block; font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--q);
+  padding:6px 12px; border-radius:8px; background:rgba(55,189,248,.08); border:1px solid rgba(55,189,248,.25); margin:14px 0;}
+
+/* ---- 데이터 테이블 ---- */
+.calc{width:100%; border-collapse:collapse; font-family:'JetBrains Mono',monospace; font-size:13px; margin-top:10px;}
+.calc th,.calc td{padding:9px 10px; text-align:right; border-bottom:1px solid var(--line);}
+.calc th{color:var(--muted); font-weight:700; font-size:11px; text-transform:uppercase; letter-spacing:.08em;}
+.calc td:first-child,.calc th:first-child{text-align:left; color:var(--ink);}
+.calc tr.win td{color:var(--hot); font-weight:700;}
+.bar{height:8px; border-radius:4px; background:var(--q); display:inline-block; vertical-align:middle; transition:width .8s cubic-bezier(.2,.8,.2,1);}
+
+/* ---- 막대(가중치/확률 시각화) ---- */
+.barrow{display:grid; grid-template-columns:90px 1fr 64px; gap:12px; align-items:center; margin:8px 0;}
+.barrow .bw{font-weight:700; font-size:15px; text-align:right; color:var(--ink);}
+.barrow .track{height:24px; border-radius:7px; background:var(--panel-2); overflow:hidden; border:1px solid var(--line);}
+.barrow .fill{height:100%; border-radius:6px; background:linear-gradient(90deg,var(--q),#7dd3fc); transition:width .6s cubic-bezier(.2,.8,.2,1); min-width:2px;}
+.barrow.win .fill{background:linear-gradient(90deg,var(--hot),#fde68a);}
+.barrow .pct{font-family:'JetBrains Mono',monospace; font-size:13px; color:var(--muted); text-align:right;}
+
+/* ---- 슬라이더 ---- */
+.ctrl{display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin:10px 0;}
+.ctrl label{font-size:13px; color:var(--muted); min-width:90px;}
+input[type=range]{accent-color:var(--q); flex:1; min-width:160px;}
+.ctrl .val{font-family:'JetBrains Mono',monospace; color:var(--hot); font-weight:700; min-width:54px; text-align:right;}
+button.btn{font-family:'Pretendard'; font-size:14px; font-weight:700; padding:10px 18px; border-radius:10px;
+  border:1px solid var(--q); background:rgba(55,189,248,.12); color:var(--q); cursor:pointer; transition:.2s;}
+button.btn:hover{background:var(--q); color:#04121f;}
+
+/* ---- SVG 차트 공통 ---- */
+.chart-wrap{background:var(--panel-2); border:1px solid var(--line); border-radius:14px; padding:18px; margin-top:14px; overflow-x:auto;}
+svg .axis{stroke:var(--line); stroke-width:1;}
+svg .axislabel{fill:var(--muted); font-family:'JetBrains Mono',monospace; font-size:10px;}
+svg .gridline{stroke:rgba(255,255,255,.05);}
+
+/* ---- 푸터 ---- */
+.foot{color:var(--faint); font-size:12px; text-align:center; margin-top:40px; font-family:'JetBrains Mono',monospace;}
+.foot a{color:var(--muted); text-decoration:none;} .foot a:hover{color:var(--q);}
+
+/* ---- VZ.AL 알고리즘 스텝 플레이어 ---- */
+.al-transport{display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:10px 0 4px;}
+.al-transport .btn{padding:8px 14px; font-size:13px;}
+.al-transport .btn.sp{padding:6px 9px; font-size:12px; background:var(--panel); color:var(--muted); border-color:var(--line);}
+.al-transport .btn.sp.on{background:var(--hot); color:#1a1206; border-color:var(--hot);}
+.al-transport .al-speed{display:inline-flex; gap:4px; margin-left:auto;}
+.al-transport input.al-scrub{accent-color:var(--hot); min-width:90px;}
+.al-stepinfo{font-family:'JetBrains Mono',monospace; font-size:13px; color:var(--muted); min-height:20px; margin:2px 0 8px; line-height:1.5;}
+.al-stepinfo .al-stepnum{display:inline-block; min-width:46px; color:var(--faint); margin-right:6px;}
+
+/* ---- VZ.AL 색 범례 ---- */
+.al-legend{display:flex; flex-wrap:wrap; gap:12px; margin:6px 0 2px; font-size:12px; color:var(--muted); font-family:'JetBrains Mono',monospace;}
+.al-leg{display:inline-flex; align-items:center; gap:5px;}
+.al-leg i{width:12px; height:12px; border-radius:3px; display:inline-block; border:1px solid rgba(255,255,255,.15);}

@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>13 · MVCC — 데이터베이스, 눈으로 보기</title>
+<link rel="stylesheet" href="shared/theme.css">
+<link rel="icon" type="image/svg+xml" href="shared/favicon.svg">
+<style>
+  .big{font-family:'JetBrains Mono',monospace; font-size:14px; color:var(--ink); margin:8px 2px 0;}
+  .ctl{display:flex; align-items:center; gap:10px; margin:10px 0; flex-wrap:wrap;}
+  svg{display:block; width:100%;}
+  .toggles{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
+  .toggles button{font-family:'JetBrains Mono',monospace;font-size:12px;padding:7px 12px;border-radius:8px;background:var(--panel-2);border:1px solid var(--line);color:var(--muted);cursor:pointer}
+  .toggles button.on{color:#0b0e14;font-weight:700}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topnav" id="topnav"></div>
+
+  <header>
+    <div class="tag" style="color:var(--hot)">PART D · 트랜잭션과 동시성 — CH 13</div>
+    <h1>MVCC</h1>
+    <p class="intro">락만 쓰면 한 가지가 아쉬워요 — 누가 쓰는 동안 <b>읽기마저 막혀</b> 기다려야 하죠. 보고서를 읽으려는데 누가 한 글자 고치고 있다고 통째로 막히는 셈이에요. 현대 데이터베이스의 답이 <b>MVCC</b>(다중 버전 동시성 제어)예요. 핵심 발상: 값을 <b>덮어쓰지 않고</b>, 바꿀 때마다 <b>새 버전</b>을 만들어 옛 버전도 남겨둬요. 그러면 각 트랜잭션은 <b>자기가 시작한 시점의 "스냅샷"(사진)</b>을 봐요 — 누가 그 사이 새 버전을 만들어도, 내 사진은 안 흔들려요. 결과는 강력해요: <b>읽기는 쓰기를 막지 않고, 쓰기도 읽기를 막지 않아요</b>. 읽는 사람은 일관된 옛 사진을, 쓰는 사람은 새 버전을 — 서로 안 기다리죠. 다만 만능은 아니에요: <b>쓰기끼리 같은 행</b>을 고치면 여전히 충돌하고(한쪽은 대기/실패), 옛 버전이 계속 쌓이니 <b>주기적으로 청소(가비지 컬렉션)</b>해야 해요. 이게 "읽기 안 막힘"의 비밀이자, 동시성 트랙에서 본 <b>가시성</b> 문제의 DB식 해법이에요.</p>
+  </header>
+
+  <nav class="stepper" id="stepper">
+    <button data-s="0" class="active">00 · 각자 다른 시간의 사진</button>
+    <button data-s="1">01 · 읽기는 쓰기를 안 막는다</button>
+    <button data-s="2">02 · 쓰기 충돌 · 버전 청소</button>
+    <button data-s="3">03 · 정리</button>
+  </nav>
+
+  <!-- STEP 0 -->
+  <section class="panel show" data-panel="0">
+    <span class="kicker" style="color:var(--hot)">Step 00 — Each Sees a Snapshot</span>
+    <h2>덮어쓰지 않고, 버전을 쌓는다</h2>
+    <p class="lead">잔액 행이 100(v1)에서 시작해요. T1이 트랜잭션을 시작해 읽는 중인데, 그 사이 T2가 200(v2)으로 바꾸고 커밋해요. 재생하면 — 값을 덮어쓰는 대신 <b>v2가 새로 쌓이고</b>, T1은 자기 시작 시점의 <b>v1(100)</b>을 계속 봐요(말풍선). 새로 온 T3는 최신 v2(200)를 보고요. <b>각자 다른 시간의 사진</b>을 보는 거예요.</p>
+    <div class="ctl"><button class="btn play" id="go0">▶ 재생</button></div>
+    <div class="scene" id="s0"></div>
+    <p class="big" id="lab0"></p>
+    <p class="note" style="margin-top:6px">→ 값을 바꿔도 옛 버전이 남아, 진행 중인 트랜잭션의 사진이 흔들리지 않아요(일관된 읽기).</p>
+  </section>
+
+  <!-- STEP 1 -->
+  <section class="panel" data-panel="1">
+    <span class="kicker" style="color:var(--q)">Step 01 — Readers Don't Block</span>
+    <h2>읽기가 안 막힌다</h2>
+    <p class="lead">누가 쓰는 동안 다른 이가 읽으려 할 때를 비교하세요. <b>락 방식</b>: 쓰기(X 락) 중엔 읽기가 <b>대기</b> — 쓰기 끝날 때까지 멈춰요. <b>MVCC</b>: 읽는 이는 <b>옛 버전(스냅샷)</b>을 바로 봐요 — 쓰는 이를 기다리지 않죠. 둘 다 일관된 값을 보지만, MVCC는 <b>아무도 안 기다려요</b>. 이게 읽기 많은 시스템에서 MVCC가 압도적인 이유예요.</p>
+    <div class="toggles" id="cmp"></div>
+    <div class="scene" id="s1"></div>
+    <p class="big" id="lab1"></p>
+    <p class="note" style="margin-top:6px">→ "읽기는 쓰기를 막지 않고, 쓰기도 읽기를 막지 않는다" — MVCC의 한 줄 요약.</p>
+  </section>
+
+  <!-- STEP 2 -->
+  <section class="panel" data-panel="2">
+    <span class="kicker" style="color:var(--v)">Step 02 — Write Conflicts · GC</span>
+    <h2>만능은 아니다</h2>
+    <p class="lead">MVCC도 두 가지 대가가 있어요. 버튼으로 보세요. <b>① 쓰기-쓰기 충돌</b>: 읽기는 안 막아도, <b>둘이 같은 행을 동시에 쓰면</b> 여전히 충돌해요 — 한쪽은 대기하거나 실패(재시도). MVCC는 읽기-쓰기를 푼 거지 쓰기-쓰기를 없앤 게 아니에요. <b>② 버전 청소(GC)</b>: 바꿀 때마다 옛 버전이 쌓이니, 아무도 안 보는 옛 버전은 <b>주기적으로 치워야</b> 해요(안 그러면 공간이 부풀어요). 특히 아주 오래 도는 트랜잭션은 옛 버전을 붙잡아 청소를 방해해요.</p>
+    <div class="toggles" id="cost"></div>
+    <div class="scene" id="s2"></div>
+    <p class="big" id="lab2"></p>
+    <p class="note" style="margin-top:6px">→ 읽기-쓰기는 풀렸지만 쓰기-쓰기는 여전히 충돌 · 버전은 공짜가 아니라 청소가 필요.</p>
+  </section>
+
+  <!-- STEP 3 -->
+  <section class="panel" data-panel="3">
+    <span class="kicker" style="color:var(--good)">Step 03 — Takeaways</span>
+    <h2>정리 — PART D를 닫으며</h2>
+    <p class="lead"><b>MVCC</b>는 값을 덮어쓰지 않고 <b>버전을 쌓아</b>, 각 트랜잭션이 <b>자기 시점의 스냅샷</b>을 보게 해요 — 그래서 <b>읽기가 쓰기를 막지 않아요</b>(현대 DB의 핵심). 단 <b>쓰기-쓰기는 여전히 충돌</b>하고, 옛 버전은 <b>청소(GC)</b>가 필요해요. 이로써 "안전하게 바꾸기"(PART D)를 마쳐요 — 트랜잭션·이상현상·락/격리·MVCC까지. 이제 마지막 PART에서 "커밋했으면 정전이 나도 안 사라진다"(내구성)와, 한 대를 넘어선 확장을 봐요.</p>
+    <div class="scene" id="s3"></div>
+    <p class="big" id="lab3"></p>
+    <p class="note" style="margin-top:14px">→ 다음 → <a href="14-wal.html" style="color:var(--q);font-weight:700">CH 14 · WAL · 내구성</a></p>
+  </section>
+
+  <p class="foot">// 코드 없는 직관 입문 · <a href="index.html">목차</a></p>
+</div>
+
+<script src="shared/lib.js"></script>
+<script src="shared/lib-db.js"></script>
+<script>
+VZ.mountTopnav('#topnav', '13 · MVCC');
+VZ.setupStepper();
+const DB=VZ.DB;
+
+// ===== STEP 0: snapshots =====
+(function(){ let cancel=null; const W=460,H=190;
+  function frame(p){ let s='';
+    // versions appear over time: v1 always, v2 after 0.45
+    const versions = p<0.45? [{ver:1,val:100,by:'초기',committed:true}] : [{ver:1,val:100,by:'초기',committed:true},{ver:2,val:200,by:'T2',committed:true}];
+    // readers: T1 started early sees v1; T3 (new) appears after 0.7 sees v2
+    const readers=[{name:'T1',sees:0,color:'var(--q)'}];
+    if(p>=0.7) readers.push({name:'T3',sees:Math.min(1,versions.length-1),color:'var(--good)',below:true});
+    s+=DB.versionChain(W,H,versions,readers,{y:80});
+    let cap = p<0.45?'T1이 v1(100)을 읽는 중':p<0.7?'T2가 v2(200)로 바꿔 커밋 — v1은 그대로 남음':'T1은 여전히 v1(100), 새 T3는 v2(200)';
+    s+=`<text x="${W/2}" y="${H-8}" text-anchor="middle" font-size="10" font-family="monospace" fill="var(--muted)">${cap}</text>`;
+    document.getElementById('s0').innerHTML=DB.svg(W,H,s,'스냅샷');
+    if(p>=1) document.getElementById('lab0').innerHTML='<b style="color:var(--q)">T1</b>은 시작 시점 사진 v1(100)을, <b style="color:var(--good)">T3</b>는 최신 v2(200)를 — 각자 다른 시간의 사진.';
+    else document.getElementById('lab0').textContent='재생 중…';
+  }
+  document.getElementById('go0').onclick=()=>{ if(cancel)cancel(); cancel=VZ.LA.tween(p=>frame(p),2800,()=>frame(1)); };
+  frame(1);
+})();
+
+// ===== STEP 1: readers don't block =====
+(function(){ let mode=1;
+  const el=document.getElementById('cmp'); el.innerHTML=`<button data-i="0">락 방식</button><button data-i="1">MVCC</button>`;
+  function render(){ const W=460,H=120;
+    const ops = mode===0?[
+      {lane:'쓰기 T',t0:0,dur:0.6,label:'X 락 보유·쓰기',kind:'write'},
+      {lane:'읽기 T',t0:0.1,dur:0.5,label:'대기(막힘)',kind:'wait'},
+      {lane:'읽기 T',t0:0.6,dur:0.3,label:'읽기',kind:'read'},
+    ]:[
+      {lane:'쓰기 T',t0:0,dur:0.6,label:'새 버전 쓰기',kind:'write'},
+      {lane:'읽기 T',t0:0.1,dur:0.4,label:'옛 버전 읽기(안 막힘)',kind:'read'},
+    ];
+    let s=DB.txTimeline(W,H,['쓰기 T','읽기 T'],ops,1.0,{tick:0.5,padL:54});
+    document.getElementById('s1').innerHTML=DB.svg(W,H,s,mode===0?'락':'MVCC');
+    document.querySelectorAll('#cmp button').forEach((b,i)=>{ const on=i===mode; b.classList.toggle('on',on); b.style.background=on?(i===0?'var(--drop)':'var(--good)'):'var(--panel-2)'; b.style.color=on?'#0b0e14':'var(--muted)'; });
+    document.getElementById('lab1').innerHTML = mode===0?'<b style="color:var(--drop)">락</b>: 쓰는 동안 읽기가 대기 — 멈춰요.':'<b style="color:var(--good)">MVCC</b>: 읽기가 옛 버전을 바로 봐요 — 안 기다림.';
+  }
+  el.addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b)return; mode=+b.dataset.i; render(); });
+  render();
+})();
+
+// ===== STEP 2: write conflict + GC =====
+(function(){ let mode=0;
+  const el=document.getElementById('cost'); el.innerHTML=`<button data-i="0">쓰기-쓰기 충돌</button><button data-i="1">버전 청소(GC)</button>`;
+  function render(){ const W=460,H=170; let s='';
+    if(mode===0){
+      const ops=[
+        {lane:'T1',t0:0,dur:0.4,label:'행 X 쓰기(잠금)',kind:'write'},
+        {lane:'T1',t0:0.4,dur:0.2,label:'커밋',kind:'commit'},
+        {lane:'T2',t0:0.15,dur:0.45,label:'같은 X 대기',kind:'wait'},
+        {lane:'T2',t0:0.6,dur:0.3,label:'쓰기(재개)',kind:'write'},
+      ];
+      s=DB.txTimeline(W,H,['T1','T2'],ops,1.0,{tick:0.5,padL:30});
+    } else {
+      const versions=[{ver:1,val:100,by:'',committed:true},{ver:2,val:200,by:'',committed:true},{ver:3,val:300,by:'',committed:true}];
+      s=DB.versionChain(W,120,versions,[{name:'활성',sees:2,color:'var(--good)'}],{y:46});
+      s+=`<text x="60" y="92" font-size="10" font-family="monospace" fill="var(--drop)">v1·v2 = 아무도 안 봄 → 청소 대상(GC)</text>`;
+      s+=`<rect x="44" y="40" width="${78}" height="40" rx="7" fill="none" stroke="var(--drop)" stroke-dasharray="4 3"/>`;
+      s+=`<rect x="152" y="40" width="${78}" height="40" rx="7" fill="none" stroke="var(--drop)" stroke-dasharray="4 3"/>`;
+    }
+    document.getElementById('s2').innerHTML=DB.svg(W,H,s,mode===0?'쓰기충돌':'GC');
+    document.querySelectorAll('#cost button').forEach((b,i)=>{ const on=i===mode; b.classList.toggle('on',on); b.style.background=on?(i===0?'var(--drop)':'var(--v)'):'var(--panel-2)'; b.style.color=on?'#0b0e14':'var(--muted)'; });
+    document.getElementById('lab2').innerHTML = mode===0?'<b style="color:var(--drop)">쓰기-쓰기</b>: 같은 행은 여전히 충돌 — 한쪽이 대기(또는 실패·재시도).':'<b style="color:var(--v)">버전 청소</b>: 아무도 안 보는 옛 버전은 치워야 — 안 그러면 공간이 부풀어요.';
+  }
+  el.addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b)return; mode=+b.dataset.i; render(); });
+  render();
+})();
+
+// ===== STEP 3 =====
+(function(){ const W=460,H=130;
+  let s=`<text x="${W/2}" y="26" fill="var(--hot)" font-size="11.5" font-family="monospace" text-anchor="middle" font-weight="700">버전을 쌓아 각자 자기 시점 사진을 본다</text>`;
+  const rows=[['읽기 안 막힘','읽기↔쓰기 서로 안 기다림(스냅샷)','var(--good)'],['쓰기 충돌','같은 행 쓰기-쓰기는 여전히 충돌','var(--drop)'],['버전 청소','옛 버전 GC 필요(공짜 아님)','var(--v)']];
+  rows.forEach((r,i)=>{ const y=40+i*28; s+=`<rect x="20" y="${y}" width="${W-40}" height="23" rx="6" fill="var(--panel)" stroke="${r[2]}" stroke-width="1.1"/><text x="34" y="${y+15.5}" fill="${r[2]}" font-size="11" font-family="monospace" font-weight="700">${r[0]}</text><text x="${W-34}" y="${y+15.5}" fill="var(--ink)" font-size="9" font-family="monospace" text-anchor="end">${r[1]}</text>`; });
+  document.getElementById('s3').innerHTML=DB.svg(W,H,s,'정리');
+  document.getElementById('lab3').innerHTML='"안전하게 바꾸기" 끝 — 이제 <b style="color:var(--q)">크래시와 규모</b>를 견디기(PART E).';
+})();
+</script>
+</body>
+</html>

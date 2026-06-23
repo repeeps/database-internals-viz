@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>11 · 동시 실행의 위험 — 데이터베이스, 눈으로 보기</title>
+<link rel="stylesheet" href="shared/theme.css">
+<link rel="icon" type="image/svg+xml" href="shared/favicon.svg">
+<style>
+  .big{font-family:'JetBrains Mono',monospace; font-size:14px; color:var(--ink); margin:8px 2px 0;}
+  .ctl{display:flex; align-items:center; gap:10px; margin:10px 0; flex-wrap:wrap;}
+  svg{display:block; width:100%;}
+  .toggles{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
+  .toggles button{font-family:'JetBrains Mono',monospace;font-size:12px;padding:7px 12px;border-radius:8px;background:var(--panel-2);border:1px solid var(--line);color:var(--muted);cursor:pointer}
+  .toggles button.on{color:#0b0e14;font-weight:700}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topnav" id="topnav"></div>
+
+  <header>
+    <div class="tag" style="color:var(--hot)">PART D · 트랜잭션과 동시성 — CH 11</div>
+    <h1>동시 실행의 위험</h1>
+    <p class="intro">트랜잭션 하나만 돌 땐 깔끔하지만, <b>여럿이 동시에</b> 같은 데이터를 건드리면 묘한 사고가 나요. 종이 장부 둘을 나눠 쓰는 직원 둘을 상상하면 쉬워요. 세 가지 대표 사고가 있어요. ① <b>더티 리드(dirty read)</b>: 직원 A가 <b>아직 확정 안 한(연필로 적은) 값</b>을 직원 B가 보고 행동했는데, A가 그걸 <b>지워버리면</b>(롤백) B는 유령 값으로 일한 꼴. ② <b>반복 불가 읽기(non-repeatable read)</b>: B가 같은 줄을 <b>두 번 읽었는데</b> 그 사이 A가 값을 바꿔 커밋해, <b>두 읽기 값이 달라요</b>. ③ <b>팬텀 리드(phantom read)</b>: B가 "잔액 50 넘는 줄"을 세었는데, 그 사이 A가 <b>새 줄을 추가</b>해, 다시 세니 <b>줄 수가 달라져요</b>. 이건 동시성 트랙의 <b>경쟁 상태</b>와 사촌이에요(똑같진 않아요 — 여긴 트랜잭션 단위의 논리적 읽기 사고). 각 사고를 종이 장부로 직접 재현해 봐요 — 다음 챕터에서 이걸 어떻게 막는지(격리수준) 봐요.</p>
+  </header>
+
+  <nav class="stepper" id="stepper">
+    <button data-s="0" class="active">00 · 더티 리드</button>
+    <button data-s="1">01 · 반복 불가 읽기</button>
+    <button data-s="2">02 · 팬텀 리드</button>
+    <button data-s="3">03 · 정리</button>
+  </nav>
+
+  <!-- STEP 0 -->
+  <section class="panel show" data-panel="0">
+    <span class="kicker" style="color:var(--hot)">Step 00 — Dirty Read</span>
+    <h2>확정 안 한 값을 읽었다</h2>
+    <p class="lead">직원 A가 잔액을 100→<b>500으로 고치는 중</b>(아직 커밋 안 함, 연필로 적은 상태)인데, 직원 B가 그 <b>500을 읽고</b> "잔액 많네, 출금 OK"라 판단해요. 그런데 A가 마음을 바꿔 <b>롤백</b>(연필 지움) → 진짜 잔액은 100. B는 <b>존재한 적 없는 500</b>을 믿고 행동한 거예요. 타임라인에서 사고 지점(↯)을 보세요.</p>
+    <div class="scene" id="s0"></div>
+    <p class="big" id="lab0"></p>
+    <p class="note" style="margin-top:6px">→ 더티 리드 = "커밋 안 한(연필) 값을 남이 봄". 가장 위험한 사고예요.</p>
+  </section>
+
+  <!-- STEP 1 -->
+  <section class="panel" data-panel="1">
+    <span class="kicker" style="color:var(--q)">Step 01 — Non-repeatable Read</span>
+    <h2>같은 줄, 두 번 읽었는데 값이 다르다</h2>
+    <p class="lead">직원 B의 한 트랜잭션 안에서 같은 줄(잔액)을 <b>두 번</b> 읽어요. 첫 읽기는 <b>100</b>. 그 사이 직원 A가 잔액을 200으로 바꾸고 <b>커밋</b>. B가 같은 줄을 <b>다시 읽으니 200</b> — 한 트랜잭션 안에서 같은 질문의 답이 <b>달라졌어요</b>. B 입장에선 발밑의 데이터가 움직인 거죠. 더티 리드와 달리 A는 <b>제대로 커밋</b>했는데도 문제가 생겨요.</p>
+    <div class="scene" id="s1"></div>
+    <p class="big" id="lab1"></p>
+    <p class="note" style="margin-top:6px">→ 반복 불가 읽기 = "한 트랜잭션 안 두 번 읽기가 불일치"(상대는 정상 커밋).</p>
+  </section>
+
+  <!-- STEP 2 -->
+  <section class="panel" data-panel="2">
+    <span class="kicker" style="color:var(--v)">Step 02 — Phantom Read</span>
+    <h2>없던 줄이 나타났다</h2>
+    <p class="lead">직원 B가 "잔액 50 넘는 줄"을 세요 — <b>3줄</b>. 보고서를 쓰는 사이, 직원 A가 잔액 80짜리 <b>새 줄을 추가</b>하고 커밋. B가 같은 조건으로 다시 세니 <b>4줄</b> — 없던 줄(유령)이 끼어들었어요. 반복 불가 읽기가 <b>기존 줄의 값</b>이 바뀌는 거라면, 팬텀은 <b>줄의 개수(집합)</b>가 바뀌는 거예요. 둘은 다른 사고라 막는 수준도 달라요.</p>
+    <div class="scene" id="s2"></div>
+    <p class="big" id="lab2"></p>
+    <p class="note" style="margin-top:6px">→ 팬텀 리드 = "같은 조건 재조회에 줄 수가 바뀜"(새 줄 삽입·삭제 때문).</p>
+  </section>
+
+  <!-- STEP 3 -->
+  <section class="panel" data-panel="3">
+    <span class="kicker" style="color:var(--good)">Step 03 — Takeaways</span>
+    <h2>정리</h2>
+    <p class="lead">동시 실행의 세 대표 사고: <b>더티 리드</b>(커밋 안 한 값을 봄), <b>반복 불가 읽기</b>(같은 줄 두 읽기가 불일치), <b>팬텀 리드</b>(같은 조건 줄 수가 바뀜). 더 높은 격리수준에서야 막히는 순서예요 — 더티(RC) < 반복불가(RR) < 팬텀(Serializable). 이들은 동시성 트랙의 <b>경쟁 상태</b>와 사촌이지만, 여기선 <b>트랜잭션 단위의 논리적 읽기</b> 문제죠. 다음 챕터에서 이 셋을 <b>어디까지 막을지</b> 고르는 다이얼 — 격리수준 — 을 봐요.</p>
+    <div class="scene" id="s3"></div>
+    <p class="big" id="lab3"></p>
+    <p class="note" style="margin-top:14px">→ 다음 → <a href="12-isolation.html" style="color:var(--q);font-weight:700">CH 12 · 락 · 격리수준</a></p>
+  </section>
+
+  <p class="foot">// 코드 없는 직관 입문 · <a href="index.html">목차</a></p>
+</div>
+
+<script src="shared/lib.js"></script>
+<script src="shared/lib-db.js"></script>
+<script>
+VZ.mountTopnav('#topnav', '11 · 동시 실행의 위험');
+VZ.setupStepper();
+const DB=VZ.DB;
+
+// ===== STEP 0: dirty read =====
+(function(){ const W=460,H=150;
+  const ops=[
+    {lane:'A',t0:0,dur:0.25,label:'잔액 500 쓰기(미커밋)',kind:'write'},
+    {lane:'A',t0:0.55,dur:0.25,label:'롤백',kind:'abort'},
+    {lane:'B',t0:0.3,dur:0.22,label:'500 읽음(연필값!)',kind:'read'},
+    {lane:'B',t0:0.55,dur:0.25,label:'출금 결정',kind:'read'},
+  ];
+  let s=DB.txTimeline(W,H,['A','B'],ops,1.0,{tick:0.5,padL:30});
+  // 사고 지점 marker around B's read of uncommitted
+  const xx=t=>30+(t/1.0)*(W-30-14); s+=`<text x="${xx(0.41)}" y="14" text-anchor="middle" font-size="13" fill="var(--drop)">↯</text>`;
+  document.getElementById('s0').innerHTML=DB.svg(W,H,s,'더티리드');
+  document.getElementById('lab0').innerHTML='B가 A의 <b style="color:var(--drop)">미커밋 500</b>을 읽고 결정 → A가 롤백 → B는 존재한 적 없는 값으로 행동(더티 리드).';
+})();
+
+// ===== STEP 1: non-repeatable read =====
+(function(){ const W=460,H=150;
+  const ops=[
+    {lane:'B',t0:0,dur:0.22,label:'읽기①=100',kind:'read'},
+    {lane:'A',t0:0.3,dur:0.25,label:'200 쓰기',kind:'write'},
+    {lane:'A',t0:0.55,dur:0.18,label:'커밋',kind:'commit'},
+    {lane:'B',t0:0.75,dur:0.22,label:'읽기②=200',kind:'read'},
+  ];
+  let s=DB.txTimeline(W,H,['A','B'],ops,1.0,{tick:0.5,padL:30});
+  const xx=t=>30+(t/1.0)*(W-30-14); s+=`<text x="${xx(0.86)}" y="14" text-anchor="middle" font-size="13" fill="var(--drop)">↯</text>`;
+  document.getElementById('s1').innerHTML=DB.svg(W,H,s,'반복불가');
+  document.getElementById('lab1').innerHTML='B의 한 트랜잭션 안: 읽기① <b>100</b> ≠ 읽기② <b style="color:var(--drop)">200</b> — A가 정상 커밋했는데도 발밑이 바뀜.';
+})();
+
+// ===== STEP 2: phantom read =====
+(function(){ const W=460,H=150;
+  const ops=[
+    {lane:'B',t0:0,dur:0.24,label:'세기①=3줄',kind:'read'},
+    {lane:'A',t0:0.32,dur:0.24,label:'새 줄 삽입(80)',kind:'write'},
+    {lane:'A',t0:0.56,dur:0.18,label:'커밋',kind:'commit'},
+    {lane:'B',t0:0.76,dur:0.24,label:'세기②=4줄',kind:'read'},
+  ];
+  let s=DB.txTimeline(W,H,['A','B'],ops,1.0,{tick:0.5,padL:30});
+  const xx=t=>30+(t/1.0)*(W-30-14); s+=`<text x="${xx(0.88)}" y="14" text-anchor="middle" font-size="13" fill="var(--drop)">↯</text>`;
+  document.getElementById('s2').innerHTML=DB.svg(W,H,s,'팬텀');
+  document.getElementById('lab2').innerHTML='B의 "잔액>50 줄 세기": 세기① <b>3줄</b> → A가 새 줄 삽입 → 세기② <b style="color:var(--drop)">4줄</b>. 없던 줄(유령)이 나타남.';
+})();
+
+// ===== STEP 3 =====
+(function(){ const W=460,H=130;
+  let s=`<text x="${W/2}" y="26" fill="var(--hot)" font-size="12" font-family="monospace" text-anchor="middle" font-weight="700">더 높은 격리수준서 막힘: 더티(RC) < 반복불가(RR) < 팬텀(Ser)</text>`;
+  const rows=[['더티 리드','커밋 안 한 값을 읽음','var(--drop)'],['반복 불가','같은 줄 두 읽기 불일치(값 변경)','var(--hot)'],['팬텀','같은 조건 줄 수 변경(삽입/삭제)','var(--v)']];
+  rows.forEach((r,i)=>{ const y=40+i*28; s+=`<rect x="20" y="${y}" width="${W-40}" height="23" rx="6" fill="var(--panel)" stroke="${r[2]}" stroke-width="1.1"/><text x="34" y="${y+15.5}" fill="${r[2]}" font-size="11" font-family="monospace" font-weight="700">${r[0]}</text><text x="${W-34}" y="${y+15.5}" fill="var(--ink)" font-size="9" font-family="monospace" text-anchor="end">${r[1]}</text>`; });
+  document.getElementById('s3').innerHTML=DB.svg(W,H,s,'정리');
+  document.getElementById('lab3').innerHTML='이 셋을 <b>어디까지 막을지</b> 고르는 다이얼 — <b style="color:var(--q)">격리수준</b>.';
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>00 · 데이터베이스라는 문제 — 데이터베이스, 눈으로 보기</title>
+<link rel="stylesheet" href="shared/theme.css">
+<link rel="icon" type="image/svg+xml" href="shared/favicon.svg">
+<style>
+  .big{font-family:'JetBrains Mono',monospace; font-size:14px; color:var(--ink); margin:8px 2px 0;}
+  .ctl{display:flex; align-items:center; gap:10px; margin:10px 0; flex-wrap:wrap;}
+  svg{display:block; width:100%;}
+  .toggles{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
+  .toggles button{font-family:'JetBrains Mono',monospace;font-size:12px;padding:7px 12px;border-radius:8px;background:var(--panel-2);border:1px solid var(--line);color:var(--muted);cursor:pointer}
+  .toggles button.on{color:#0b0e14;font-weight:700}
+  .cmap{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-top:8px}
+  .cmap .pt{background:var(--panel-2);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+  .cmap .pt b{font-family:'JetBrains Mono',monospace;font-size:12px}
+  .cmap .pt p{margin:6px 0 0;font-size:12px;color:var(--muted);line-height:1.5}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topnav" id="topnav"></div>
+
+  <header>
+    <div class="tag" style="color:var(--q)">입문 · INTRO</div>
+    <h1>데이터베이스라는 문제</h1>
+    <p class="intro">데이터베이스를 아주 단순하게 보면 <b>거대한 종이 장부</b>예요 — 행(줄)이 끝없이 쌓인 표. 두 가지 골치 아픈 일이 생기죠. ① 장부가 두꺼워질수록 원하는 줄을 <b>찾기가 느려져요</b>(처음부터 한 줄씩 훑어야 하니까). ② 두 사람이 <b>동시에 같은 줄을 고치면</b> 한쪽 수정이 사라지거나 값이 깨져요. 데이터베이스 엔진이 하는 일의 9할은 이 둘을 푸는 거예요 — <b>빨리(그리고 똑똑하게) 찾기</b>와 <b>안전하게 바꾸기</b>. 이 트랙은 SQL 문법 강좌가 아니라, 그 <b>보이지 않는 엔진 속 동작</b>을 그림으로 보는 거예요. 이번 0번에서 문제의 두 기둥과 전체 지도, 그리고 우리가 쓸 용어를 잡아요.</p>
+  </header>
+
+  <nav class="stepper" id="stepper">
+    <button data-s="0" class="active">00 · 두꺼운 장부</button>
+    <button data-s="1">01 · 두 숙제</button>
+    <button data-s="2">02 · 용어표</button>
+    <button data-s="3">03 · 전체 지도</button>
+  </nav>
+
+  <!-- STEP 0 -->
+  <section class="panel show" data-panel="0">
+    <span class="kicker" style="color:var(--hot)">Step 00 — The Thick Ledger</span>
+    <h2>장부가 두꺼워지면 찾기가 느려진다</h2>
+    <p class="lead">행이 쌓인 장부에서 특정 줄을 찾아요. <b>정렬이 없으면</b> 처음부터 한 줄씩 훑는 수밖에 없어요(풀 스캔). 재생하면 위에서 아래로 훑어 내려가는 게 보여요. 슬라이더로 행 수를 늘려 보세요 — <b>찾는 비용이 행 수에 비례</b>해 커져요. 이게 인덱스가 필요한 이유의 출발점이에요.</p>
+    <div class="ctl"><label>행 수 <span id="nL" style="color:var(--hot)">8</span></label><input type="range" id="nv" min="4" max="16" step="1" value="8" style="flex:1;max-width:200px"><button class="btn play" id="go0">▶ 훑기</button></div>
+    <div class="scene" id="s0"></div>
+    <p class="big" id="lab0"></p>
+    <p class="note" style="margin-top:6px">→ "처음부터 끝까지"는 행이 많아질수록 느려져요 — 이걸 어떻게 한 번에 점프할까?(인덱스, PART B)</p>
+  </section>
+
+  <!-- STEP 1 -->
+  <section class="panel" data-panel="1">
+    <span class="kicker" style="color:var(--q)">Step 01 — Two Jobs</span>
+    <h2>엔진의 두 숙제</h2>
+    <p class="lead">버튼으로 두 숙제를 비교하세요. <b>① 빨리 찾기</b>: 미리 정렬해 둔 <b>길잡이(인덱스)</b>가 있으면 훑지 않고 바로 점프해요 — 게다가 길이 여럿이면 <b>어느 길이 빠른지 골라야</b> 하죠(쿼리 플래너). <b>② 안전하게 바꾸기</b>: 두 사람이 같은 줄을 동시에 고치면 한쪽이 덮여 사라져요 — 그래서 <b>한 덩어리로·차례로</b> 다루는 장치(트랜잭션)가 필요해요.</p>
+    <div class="toggles" id="job"></div>
+    <div class="scene" id="s1"></div>
+    <p class="big" id="lab1"></p>
+    <p class="note" style="margin-top:6px">→ 이 두 숙제가 트랙의 두 기둥 — <b>인덱스(B)</b>와 <b>트랜잭션·동시성(D)</b>. 사이의 C(쿼리 실행)는 "어느 길로 찾을지 고르는" 다리예요.</p>
+  </section>
+
+  <!-- STEP 2 -->
+  <section class="panel" data-panel="2">
+    <span class="kicker" style="color:var(--v)">Step 02 — Glossary</span>
+    <h2>용어표 — 장부의 말 ↔ DB의 말</h2>
+    <p class="lead">앞으로 쓸 말들을 종이 장부에 빗대어 잡아둬요. 어려운 게 아니라 — 표(테이블), 줄(행), 한 묶음으로 읽는 종이 한 장(페이지), 빨리 찾는 길잡이(인덱스), 한 덩어리 작업(트랜잭션)이에요. 이 다섯 단어면 트랙 대부분이 풀려요.</p>
+    <div class="scene" id="s2"></div>
+    <p class="big" id="lab2"></p>
+  </section>
+
+  <!-- STEP 3 -->
+  <section class="panel" data-panel="3">
+    <span class="kicker" style="color:var(--good)">Step 03 — The Map</span>
+    <h2>전체 지도</h2>
+    <p class="lead">다섯 PART로 가요. <b>저장(A)</b>으로 시작해 — 데이터가 디스크에 어떻게 놓이나. 그 위에 <b>인덱스(B)</b>로 빨리 찾고, <b>쿼리 실행(C)</b>으로 똑똑하게 고르고, <b>트랜잭션(D)</b>으로 안전하게 바꾸고, <b>내구성·확장(E)</b >으로 크래시와 규모를 견뎌요. 두 별표가 두 기둥이에요.</p>
+    <div class="cmap" id="cmap"></div>
+    <p class="note" style="margin-top:14px">→ 시작 → <a href="01-disk-is-slow.html" style="color:var(--q);font-weight:700">CH 01 · 디스크는 느리다</a></p>
+  </section>
+
+  <p class="foot">// 코드 없는 직관 입문 · <a href="index.html">목차</a></p>
+</div>
+
+<script src="shared/lib.js"></script>
+<script src="shared/lib-db.js"></script>
+<script>
+VZ.mountTopnav('#topnav', '00 · 데이터베이스라는 문제');
+VZ.setupStepper();
+const DB=VZ.DB, clamp=VZ.clamp;
+
+// ===== STEP 0: ledger full scan =====
+(function(){ let n=8, cancel=null;
+  const nv=document.getElementById('nv'), nL=document.getElementById('nL');
+  const NAMES=['Ann','Bob','Cy','Dan','Eve','Fay','Gus','Hal','Ivy','Jo','Kim','Lee','Min','Noa','Ola','Pat'];
+  const tgt=()=>Math.max(1, n-2); // 찾는 줄을 끝부분에 둬, 테이블이 길수록 스캔도 길어지게
+  function rowsAt(scanTo){ const t=tgt(); const rows=[]; for(let i=0;i<n;i++){ let st=''; if(i<scanTo) st = (i===t?'ok':'miss'); else if(i===scanTo) st='active'; rows.push({cells:[NAMES[i], (100+i*7)], state:st}); } return rows; }
+  function frame(p){ const t=tgt(); const scanTo=Math.min(n-1, Math.round(p*t)); // stop at target
+    const W=460,H=44+ (Math.min(n,16))*22 + 8; let s='';
+    s+=DB.ledger(20,16,420,['이름','잔액','스캔'], rowsAt(scanTo));
+    document.getElementById('s0').innerHTML=DB.svg(W,Math.min(H,400),s,'풀스캔');
+    const done = scanTo>=t;
+    document.getElementById('lab0').innerHTML = done?`찾음 — <b style="color:var(--good)">${t+1}번째 줄</b>에서 '${NAMES[t]}' 발견. 그 전까지 ${t}줄을 헛읽었어요.`:`위에서부터 한 줄씩 훑는 중… (${scanTo+1}/${n})`;
+  }
+  nv.oninput=()=>{ n=+nv.value; nL.textContent=n; frame(1); };
+  document.getElementById('go0').onclick=()=>{ if(cancel)cancel(); cancel=VZ.LA.tween(p=>frame(p),1400,()=>frame(1)); };
+  frame(1);
+})();
+
+// ===== STEP 1: two jobs =====
+(function(){ let job=0;
+  const el=document.getElementById('job'); el.innerHTML=`<button data-i="0">① 빨리 찾기</button><button data-i="1">② 안전하게 바꾸기</button>`;
+  function render(){ const W=460,H=180; let s='';
+    if(job===0){ // index jump vs scan
+      s+=`<text x="${W/2}" y="22" fill="var(--v)" font-size="11.5" font-family="monospace" text-anchor="middle" font-weight="700">길잡이(인덱스)로 바로 점프</text>`;
+      // 책 뒤 '목차'처럼: Cy → 해당 줄
+      s+=DB.box(40,38,150,40,'목차(인덱스)',{color:'var(--v)',fs:11,sub:'Cy → 2번 줄'});
+      s+=DB.table(280,34,140,[{label:'Ann',state:'miss'},{label:'Cy',state:'ok'},{label:'Hal',state:''}],{rh:18});
+      s+=DB.edge(190,58,280,60,{color:'var(--v)',lw:1.8});
+      s+=`<text x="${W/2}" y="118" fill="var(--good)" font-size="10.5" font-family="monospace" text-anchor="middle">훑지 않고 한 번에 해당 줄로 점프</text>`;
+      s+=`<text x="${W/2}" y="150" fill="var(--muted)" font-size="10" font-family="monospace" text-anchor="middle">단, 길이 여럿이면 어느 길이 빠른지 골라야 해요(플래너 · PART C)</text>`;
+    } else { // two writers clobber
+      s+=DB.box(30,30,120,40,'사용자 A',{color:'var(--q)',fs:11,sub:'잔액 100→120'});
+      s+=DB.box(310,30,120,40,'사용자 B',{color:'var(--pink)',fs:11,sub:'잔액 100→90'});
+      s+=DB.ledger(W/2-70,96,140,['잔액'],[{cells:['90?'],state:'abort'}]);
+      s+=DB.edge(90,70,W/2-40,96,{color:'var(--q)',lw:1.4,dash:'4 3'}); s+=DB.edge(370,70,W/2+40,96,{color:'var(--pink)',lw:1.4,dash:'4 3'});
+      s+=`<text x="${W/2}" y="172" fill="var(--drop)" font-size="10" font-family="monospace" text-anchor="middle">둘이 동시에 고침 → A의 +20이 사라짐. 차례로·한 덩어리로 다뤄야(트랜잭션)</text>`;
+    }
+    document.getElementById('s1').innerHTML=DB.svg(W,H,s,job===0?'빨리찾기':'안전하게');
+    document.querySelectorAll('#job button').forEach((b,i)=>{ const on=i===job; b.classList.toggle('on',on); b.style.background=on?(i===0?'var(--v)':'var(--pink)'):'var(--panel-2)'; b.style.color=on?'#0b0e14':'var(--muted)'; });
+    document.getElementById('lab1').innerHTML = job===0?'<b style="color:var(--v)">빨리 찾기</b>: 인덱스로 점프(+ 길 고르기). → PART B·C':'<b style="color:var(--pink)">안전하게 바꾸기</b>: 동시 수정이 깨지지 않게. → PART D';
+  }
+  el.addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b)return; job=+b.dataset.i; render(); });
+  render();
+})();
+
+// ===== STEP 2: glossary =====
+(function(){ const W=460; const G=[
+    ['테이블 (table)','장부 한 권 — 같은 종류의 줄을 모은 표'],
+    ['행 (row)','장부의 한 줄 — 레코드 하나'],
+    ['페이지 (page)','디스크에서 한 번에 읽는 종이 한 장(여러 행)'],
+    ['인덱스 (index)','빨리 찾는 길잡이 — 미리 정렬해 둔 목차'],
+    ['트랜잭션 (transaction)','한 덩어리로 취급하는 작업 묶음(전부 or 전무)'],
+  ]; const H=20+G.length*30; let s='';
+  G.forEach((g,i)=>{ const y=14+i*30; s+=`<rect x="14" y="${y}" width="170" height="24" rx="6" fill="var(--panel)" stroke="var(--q)"/><text x="99" y="${y+16}" text-anchor="middle" font-size="10.5" font-family="monospace" fill="var(--q)" font-weight="700">${g[0]}</text>`;
+    s+=`<text x="196" y="${y+16}" font-size="10.5" font-family="monospace" fill="var(--ink)">${g[1]}</text>`; });
+  document.getElementById('s2').innerHTML=DB.svg(W,H,s,'용어표');
+  document.getElementById('lab2').innerHTML='이 다섯 단어가 트랙 전체의 뼈대 — 나머지는 다 이 위에 쌓여요.';
+})();
+
+// ===== STEP 3: course map =====
+(function(){ const PARTS=[
+    ['A · 저장과 읽기','디스크·페이지·풀스캔 — 데이터가 어떻게 놓이나','var(--q)'],
+    ['B · 인덱스 ★','정렬·B+tree·범위·비용 — 빨리 찾기','var(--hot)'],
+    ['C · 쿼리 실행','플래너·카디널리티·조인 — 똑똑하게 고르기','var(--v)'],
+    ['D · 트랜잭션·동시성 ★','ACID·이상현상·락·MVCC — 안전하게 바꾸기','var(--hot)'],
+    ['E · 내구성·확장','WAL·복제·샤딩 — 크래시와 규모 견디기','var(--good)'],
+  ];
+  document.getElementById('cmap').innerHTML = PARTS.map(p=>`<div class="pt" style="border-color:${p[2]}"><b style="color:${p[2]}">${p[0]}</b><p>${p[1]}</p></div>`).join('');
+})();
+</script>
+</body>
+</html>

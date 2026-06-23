@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>15 · 복제 · 샤딩 — 데이터베이스, 눈으로 보기</title>
+<link rel="stylesheet" href="shared/theme.css">
+<link rel="icon" type="image/svg+xml" href="shared/favicon.svg">
+<style>
+  .big{font-family:'JetBrains Mono',monospace; font-size:14px; color:var(--ink); margin:8px 2px 0;}
+  .ctl{display:flex; align-items:center; gap:10px; margin:10px 0; flex-wrap:wrap;}
+  svg{display:block; width:100%;}
+  .toggles{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
+  .toggles button{font-family:'JetBrains Mono',monospace;font-size:12px;padding:7px 12px;border-radius:8px;background:var(--panel-2);border:1px solid var(--line);color:var(--muted);cursor:pointer}
+  .toggles button.on{color:#0b0e14;font-weight:700}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topnav" id="topnav"></div>
+
+  <header>
+    <div class="tag" style="color:var(--good)">PART E · 내구성과 확장 — CH 15</div>
+    <h1>복제 · 샤딩</h1>
+    <p class="intro">한 대의 데이터베이스가 감당 못 할 만큼 커지면 어떻게 할까요? 두 가지 길이 있어요. <b>복제(replication)</b>는 <b>같은 데이터를 여러 대에 복사</b>해 두는 거예요 — 보통 쓰기는 한 대(<b>primary</b>)가 받고, 읽기는 여러 <b>복제본(replica)</b>이 나눠 처리해요. 읽기가 많은 서비스의 부하를 분산하고, 한 대가 죽어도 다른 대가 버텨주죠. 대신 복사가 전파되는 데 <b>시간이 걸려서</b>, 방금 쓴 걸 복제본에서 읽으면 <b>아직 옛 값</b>일 수 있어요(일관성↔지연의 맞교환). <b>샤딩(sharding)</b>은 <b>데이터를 키로 쪼개 여러 대에 나눠 담는</b> 거예요 — 예컨대 고객을 지역별로 갈라 각 서버가 일부만 맡죠. 데이터가 한 대에 안 들어갈 때 쓰지만, <b>여러 샤드에 걸친 조인이나 트랜잭션이 어려워지는</b> 큰 대가가 따라요. 복제는 "같은 걸 여러 벌", 샤딩은 "다른 조각을 나눠" — 둘 다 만능이 아니라 분명한 트레이드오프예요. (여러 대가 합의하는 더 깊은 이야기는 분산 시스템의 영역이에요.)</p>
+  </header>
+
+  <nav class="stepper" id="stepper">
+    <button data-s="0" class="active">00 · 복제 (읽기 분산)</button>
+    <button data-s="1">01 · 동기 vs 비동기</button>
+    <button data-s="2">02 · 샤딩 (쪼개기)</button>
+    <button data-s="3">03 · 정리</button>
+  </nav>
+
+  <!-- STEP 0 -->
+  <section class="panel show" data-panel="0">
+    <span class="kicker" style="color:var(--hot)">Step 00 — Replication</span>
+    <h2>같은 데이터를 여러 벌</h2>
+    <p class="lead">쓰기는 <b>primary</b> 한 대가 받고, 그 변경을 <b>복제본들</b>에 전파해요. 읽기 요청은 여러 복제본이 <b>나눠</b> 처리하죠. 재생하면 — 쓰기가 primary로 가고, 거기서 복제본으로 흘러가고, 읽기들은 복제본에서 분산 처리되는 게 보여요. 읽기가 많은 서비스에 딱이에요(읽기 부하를 N대로 나눔). 한 대가 죽어도 나머지가 버티는 <b>가용성</b> 보너스도 있고요.</p>
+    <div class="ctl"><button class="btn play" id="go0">▶ 재생</button></div>
+    <div class="scene" id="s0"></div>
+    <p class="big" id="lab0"></p>
+    <p class="note" style="margin-top:6px">→ 복제 = 같은 데이터 여러 벌 → 읽기 분산 + 가용성. 쓰기는 한 곳(primary)으로.</p>
+  </section>
+
+  <!-- STEP 1 -->
+  <section class="panel" data-panel="1">
+    <span class="kicker" style="color:var(--q)">Step 01 — Sync vs Async</span>
+    <h2>일관성과 지연의 맞교환</h2>
+    <p class="lead">전파 방식이 두 가지예요. 버튼으로 비교하세요. <b>동기 복제</b>: 복제본까지 다 받은 걸 확인한 뒤에야 쓰기 완료 — <b>항상 최신</b>이지만 그만큼 <b>느려요</b>(복제본을 기다림). <b>비동기 복제</b>: primary가 먼저 완료 처리하고 전파는 뒤따라가요 — <b>빠르지만</b> 잠깐 복제본이 <b>옛 값</b>일 수 있어요. 그래서 "방금 내가 쓴 걸 바로 못 보는"(read-your-writes) 일이 생기죠. 무엇이 더 중요하냐로 골라요.</p>
+    <div class="toggles" id="sync"></div>
+    <div class="scene" id="s1"></div>
+    <p class="big" id="lab1"></p>
+    <p class="note" style="margin-top:6px">→ 동기=일관성 우선(느림), 비동기=속도 우선(잠깐 stale). 공짜 점심은 없어요.</p>
+  </section>
+
+  <!-- STEP 2 -->
+  <section class="panel" data-panel="2">
+    <span class="kicker" style="color:var(--v)">Step 02 — Sharding</span>
+    <h2>데이터를 키로 쪼갠다</h2>
+    <p class="lead">복제가 "같은 걸 여러 벌"이라면, <b>샤딩</b>은 "<b>다른 조각</b>을 나눠 담기"예요. 키(예: 고객 지역·ID 범위)로 갈라 각 서버가 일부만 맡죠 — 데이터가 한 대에 안 들어갈 때, 쓰기까지 분산하고 싶을 때 써요. 버튼으로 보세요. <b>한 샤드 안 질의</b>: 빠름(한 대만). <b>여러 샤드 걸친 질의</b>(교차 조인·트랜잭션): 여러 대를 모아야 해 <b>느리고 복잡</b>해요 — 샤딩의 가장 큰 대가예요. 그래서 "어떤 키로 쪼개느냐"가 결정적이에요.</p>
+    <div class="toggles" id="shard"></div>
+    <div class="scene" id="s2"></div>
+    <p class="big" id="lab2"></p>
+    <p class="note" style="margin-top:6px">→ 샤딩 = 조각 나누기 → 용량·쓰기 확장. 단 교차 샤드 조인/트랜잭션이 어려워요.</p>
+  </section>
+
+  <!-- STEP 3 -->
+  <section class="panel" data-panel="3">
+    <span class="kicker" style="color:var(--good)">Step 03 — Takeaways</span>
+    <h2>정리</h2>
+    <p class="lead"><b>복제</b>(같은 데이터 여러 벌)는 읽기 분산과 가용성을 주지만 <b>일관성↔지연</b>의 맞교환이 있고(동기는 느리고 일관, 비동기는 빠르나 stale), <b>샤딩</b>(데이터를 키로 쪼갬)은 용량·쓰기 확장을 주지만 <b>교차 샤드 조인·트랜잭션</b>이 어려워져요. 둘 다 만능이 아니라 분명한 대가가 있는 도구예요. 여러 대가 어떻게 <b>합의</b>하고 장애를 견디는지의 더 깊은 이야기(합의·CAP)는 분산 시스템의 영역이고요. 마지막 챕터에서 지금까지 안 다룬 데이터베이스의 <b>다른 풍경</b>들을 한눈에 보고, 처음의 종이 장부로 돌아가 마무리해요.</p>
+    <div class="scene" id="s3"></div>
+    <p class="big" id="lab3"></p>
+    <p class="note" style="margin-top:14px">→ 다음 → <a href="16-beyond.html" style="color:var(--q);font-weight:700">CH 16 · 너머 · 마무리</a></p>
+  </section>
+
+  <p class="foot">// 코드 없는 직관 입문 · <a href="index.html">목차</a></p>
+</div>
+
+<script src="shared/lib.js"></script>
+<script src="shared/lib-db.js"></script>
+<script>
+VZ.mountTopnav('#topnav', '15 · 복제·샤딩');
+VZ.setupStepper();
+const DB=VZ.DB;
+
+// ===== STEP 0: replication (play) =====
+(function(){ let cancel=null; const W=460,H=190;
+  function frame(p){ let s='';
+    // primary top-center, 3 replicas bottom
+    s+=DB.box(W/2-55,24,110,38,'primary',{color:'var(--hot)',fs:11,sub:'쓰기 받음'});
+    const rx=[60,200,340];
+    rx.forEach((x,i)=>{ s+=DB.box(x,130,90,36,'복제본'+(i+1),{color:'var(--q)',fs:10}); });
+    // write arrow into primary (0-0.3)
+    if(p<0.35){ s+=DB.edge(W/2,8,W/2,24,{color:'var(--hot)',lw:2}); s+=`<text x="${W/2+40}" y="16" font-size="9" font-family="monospace" fill="var(--hot)">쓰기</text>`; }
+    // propagation primary->replicas (0.3-0.65)
+    if(p>0.3){ rx.forEach((x,i)=>{ s+=DB.edge(W/2,62,x+45,130,{color:'var(--q)',lw:1.4,dash:'4 3'}); }); if(p<0.65) s+=`<text x="${W/2}" y="100" text-anchor="middle" font-size="9" font-family="monospace" fill="var(--q)">전파…</text>`; }
+    // reads from replicas (0.65-1)
+    if(p>0.65){ rx.forEach((x,i)=>{ s+=DB.edge(x+45,166,x+45,184,{color:'var(--good)',lw:1.6}); }); s+=`<text x="${W/2}" y="182" text-anchor="middle" font-size="9.5" font-family="monospace" fill="var(--good)">읽기 요청을 복제본들이 나눠 처리</text>`; }
+    document.getElementById('s0').innerHTML=DB.svg(W,H,s,'복제');
+    if(p>=1) document.getElementById('lab0').innerHTML='쓰기는 <b style="color:var(--hot)">primary</b> → 복제본 전파, 읽기는 <b style="color:var(--good)">복제본들이 분산</b>. 읽기 부하가 N대로.';
+    else document.getElementById('lab0').textContent='재생 중…';
+  }
+  document.getElementById('go0').onclick=()=>{ if(cancel)cancel(); cancel=VZ.LA.tween(p=>frame(p),2800,()=>frame(1)); };
+  frame(1);
+})();
+
+// ===== STEP 1: sync vs async =====
+(function(){ let mode=1;
+  const el=document.getElementById('sync'); el.innerHTML=`<button data-i="0">동기 복제</button><button data-i="1">비동기 복제</button>`;
+  function render(){ const W=460,H=130;
+    const ops = mode===0?[
+      {lane:'쓰기',t0:0,dur:0.25,label:'primary 기록',kind:'write'},
+      {lane:'쓰기',t0:0.25,dur:0.5,label:'복제본 확인 대기',kind:'wait'},
+      {lane:'쓰기',t0:0.75,dur:0.2,label:'완료',kind:'commit'},
+    ]:[
+      {lane:'쓰기',t0:0,dur:0.25,label:'primary 기록',kind:'write'},
+      {lane:'쓰기',t0:0.25,dur:0.18,label:'완료(빠름)',kind:'commit'},
+      {lane:'전파',t0:0.43,dur:0.45,label:'뒤따라 전파',kind:'write'},
+    ];
+    let s=DB.txTimeline(W,H,['쓰기','전파'],ops,1.0,{tick:0.5,padL:40});
+    document.getElementById('s1').innerHTML=DB.svg(W,H,s,mode===0?'동기':'비동기');
+    document.querySelectorAll('#sync button').forEach((b,i)=>{ const on=i===mode; b.classList.toggle('on',on); b.style.background=on?(i===0?'var(--v)':'var(--good)'):'var(--panel-2)'; b.style.color=on?'#0b0e14':'var(--muted)'; });
+    document.getElementById('lab1').innerHTML = mode===0?'<b style="color:var(--v)">동기</b>: 복제본까지 확인 후 완료 — 항상 최신이나 느림.':'<b style="color:var(--good)">비동기</b>: primary 먼저 완료, 전파는 뒤 — 빠르나 잠깐 복제본이 옛 값(stale).';
+  }
+  el.addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b)return; mode=+b.dataset.i; render(); });
+  render();
+})();
+
+// ===== STEP 2: sharding =====
+(function(){ let mode=0;
+  const el=document.getElementById('shard'); el.innerHTML=`<button data-i="0">한 샤드 안 질의</button><button data-i="1">여러 샤드 걸친 질의</button>`;
+  function render(){ const W=460,H=170; const cross=mode===1; let s='';
+    const sx=[40,180,320]; const ranges=['A~H','I~P','Q~Z'];
+    sx.forEach((x,i)=>{ const active = cross || i===0; s+=DB.box(x,60,100,44,'샤드'+(i+1),{color:active?'var(--v)':'var(--line)',fs:11,sub:ranges[i],dim:!active}); });
+    s+=DB.box(W/2-50,16,100,30, cross?'교차 질의':'질의',{color:cross?'var(--drop)':'var(--good)',fs:11});
+    if(!cross){ s+=DB.edge(W/2,46,90,60,{color:'var(--good)',lw:1.8}); s+=`<text x="${W/2}" y="130" text-anchor="middle" font-size="11" font-family="monospace" fill="var(--good)" font-weight="700">샤드1만 — 빠름(한 대)</text>`; }
+    else { sx.forEach((x,i)=>s+=DB.edge(W/2,46,x+50,60,{color:'var(--drop)',lw:1.6,dash:'4 3'})); s+=`<text x="${W/2}" y="130" text-anchor="middle" font-size="11" font-family="monospace" fill="var(--drop)" font-weight="700">세 샤드 모아야 — 느리고 복잡</text>`; }
+    s+=`<text x="${W/2}" y="152" text-anchor="middle" font-size="9.5" font-family="monospace" fill="var(--muted)">데이터를 키(이름 범위)로 쪼개 나눠 담음</text>`;
+    document.getElementById('s2').innerHTML=DB.svg(W,H,s,cross?'교차샤드':'단일샤드');
+    document.querySelectorAll('#shard button').forEach((b,i)=>{ const on=i===mode; b.classList.toggle('on',on); b.style.background=on?(i===0?'var(--good)':'var(--drop)'):'var(--panel-2)'; b.style.color=on?'#0b0e14':'var(--muted)'; });
+    document.getElementById('lab2').innerHTML = cross?'<b style="color:var(--drop)">교차 샤드</b>: 여러 대를 모아야 해 느리고 복잡 — 샤딩 최대 대가.':'<b style="color:var(--good)">한 샤드</b>: 키가 한 대에 있으면 빠름 — 그래서 쪼개는 키 선택이 핵심.';
+  }
+  el.addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b)return; mode=+b.dataset.i; render(); });
+  render();
+})();
+
+// ===== STEP 3 =====
+(function(){ const W=460,H=110;
+  let s=`<text x="${W/2}" y="26" fill="var(--good)" font-size="12" font-family="monospace" text-anchor="middle" font-weight="700">복제=같은 걸 여러 벌 · 샤딩=조각 나누기</text>`;
+  const rows=[['복제','읽기 분산·가용성 ↔ 일관성/지연','var(--q)'],['샤딩','용량·쓰기 확장 ↔ 교차 조인·트랜잭션 난해','var(--v)']];
+  rows.forEach((r,i)=>{ const y=42+i*30; s+=`<rect x="20" y="${y}" width="${W-40}" height="25" rx="6" fill="var(--panel)" stroke="${r[2]}" stroke-width="1.1"/><text x="34" y="${y+16.5}" fill="${r[2]}" font-size="11" font-family="monospace" font-weight="700">${r[0]}</text><text x="${W-34}" y="${y+16.5}" fill="var(--ink)" font-size="8.5" font-family="monospace" text-anchor="end">${r[1]}</text>`; });
+  document.getElementById('s3').innerHTML=DB.svg(W,H,s,'정리');
+  document.getElementById('lab3').innerHTML='마지막 — 안 다룬 <b style="color:var(--q)">다른 풍경</b>들과 마무리.';
+})();
+</script>
+</body>
+</html>

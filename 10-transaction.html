@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>10 · 트랜잭션 · ACID — 데이터베이스, 눈으로 보기</title>
+<link rel="stylesheet" href="shared/theme.css">
+<link rel="icon" type="image/svg+xml" href="shared/favicon.svg">
+<style>
+  .big{font-family:'JetBrains Mono',monospace; font-size:14px; color:var(--ink); margin:8px 2px 0;}
+  .ctl{display:flex; align-items:center; gap:10px; margin:10px 0; flex-wrap:wrap;}
+  svg{display:block; width:100%;}
+  .toggles{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
+  .toggles button{font-family:'JetBrains Mono',monospace;font-size:12px;padding:7px 12px;border-radius:8px;background:var(--panel-2);border:1px solid var(--line);color:var(--muted);cursor:pointer}
+  .toggles button.on{color:#0b0e14;font-weight:700}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topnav" id="topnav"></div>
+
+  <header>
+    <div class="tag" style="color:var(--hot)">PART D · 트랜잭션과 동시성 — CH 10</div>
+    <h1>트랜잭션 · ACID</h1>
+    <p class="intro">데이터베이스의 다른 절반은 "안전하게 바꾸기"예요. 계좌이체를 생각해 보세요 — A에서 1만 원을 <b>빼고</b> B에 <b>더해요</b>. 이 둘은 <b>한 덩어리</b>여야 해요. 빼는 데 성공하고 더하기 직전에 정전이 나면? 돈이 <b>증발</b>하죠. 그래서 데이터베이스는 여러 작업을 <b>트랜잭션</b>이라는 한 묶음으로 다뤄요: <b>전부 성공(커밋)하거나, 하나라도 실패하면 전부 없던 일로(롤백)</b> — 중간 상태로 남지 않아요. 이게 <b>원자성(Atomicity)</b>이에요. 트랜잭션의 성질은 흔히 <b>ACID</b> 네 글자로 불러요: <b>A</b>tomicity(원자성), <b>C</b>onsistency(일관성), <b>I</b>solation(격리), <b>D</b>urability(내구성). 이번엔 그중 가장 직관적인 <b>원자성</b>과, 다음 세 챕터의 주인공인 <b>격리</b>를 중심으로 봐요(내구성은 CH14에서, 일관성은 나머지의 결과예요). 핵심 약속은 하나 — <b>"한 덩어리로 취급한다."</b></p>
+  </header>
+
+  <nav class="stepper" id="stepper">
+    <button data-s="0" class="active">00 · 전부 아니면 전무</button>
+    <button data-s="1">01 · ACID 네 글자</button>
+    <button data-s="2">02 · 커밋과 롤백</button>
+    <button data-s="3">03 · 정리</button>
+  </nav>
+
+  <!-- STEP 0 -->
+  <section class="panel show" data-panel="0">
+    <span class="kicker" style="color:var(--hot)">Step 00 — All or Nothing</span>
+    <h2>중간 상태로 남지 않는다</h2>
+    <p class="lead">A→B 계좌이체(A에서 빼고 B에 더하기)를 두 경우로 재생하세요. <b>정상</b>: 둘 다 성공 → 커밋, 합계 보존. <b>중간 실패</b>: A에서 뺀 직후 사고 발생 → <b>롤백</b>으로 뺀 것까지 되돌려, 돈이 증발하지 않아요. 트랜잭션이 없으면 "뺐는데 안 더해진" 깨진 상태가 남죠. 전부거나, 전무거나.</p>
+    <div class="toggles" id="mode"></div>
+    <div class="ctl"><button class="btn play" id="go0">▶ 재생</button></div>
+    <div class="scene" id="s0"></div>
+    <p class="big" id="lab0"></p>
+    <p class="note" style="margin-top:6px">→ 원자성 = "한 덩어리". 중간에 실패하면 시작 전으로 깨끗이 되돌려요(롤백).</p>
+  </section>
+
+  <!-- STEP 1 -->
+  <section class="panel" data-panel="1">
+    <span class="kicker" style="color:var(--q)">Step 01 — The Four Letters</span>
+    <h2>ACID</h2>
+    <p class="lead">트랜잭션의 네 성질을 눌러 보세요. <b>A 원자성</b>: 전부 아니면 전무(방금 봤죠). <b>C 일관성</b>: 규칙(제약)을 지킨 상태에서 지킨 상태로만 — 나머지 셋의 결과예요. <b>I 격리</b>: 여럿이 동시에 돌아도 <b>서로 안 꼬이게</b> — 다음 세 챕터의 핵심. <b>D 내구성</b>: 커밋했으면 정전이 나도 <b>안 사라짐</b> — CH14에서 봐요. 이번 PART는 특히 <b>A와 I</b>에 집중해요.</p>
+    <div class="toggles" id="acid"></div>
+    <div class="scene" id="s1"></div>
+    <p class="big" id="lab1"></p>
+    <p class="note" style="margin-top:6px">→ 네 글자 중 이 PART의 주인공은 <b>A(원자성)</b>와 <b>I(격리)</b> — 동시 실행의 안전이 곧 I예요.</p>
+  </section>
+
+  <!-- STEP 2 -->
+  <section class="panel" data-panel="2">
+    <span class="kicker" style="color:var(--v)">Step 02 — Commit & Rollback</span>
+    <h2>커밋 = 약속, 롤백 = 무효</h2>
+    <p class="lead">트랜잭션엔 <b>경계</b>가 있어요 — 시작(BEGIN)부터 끝(COMMIT/ROLLBACK)까지. <b>커밋 전</b>엔 아무것도 확정되지 않고, 변경은 <b>나만 보는 임시 상태</b>예요(다른 사람에겐 아직 안 보임 — 이게 격리의 씨앗). <b>커밋</b>하는 순간 모든 변경이 한꺼번에 확정·공개되고, <b>롤백</b>하면 전부 없던 일이 돼요. 타임라인으로 두 끝맺음을 비교하세요.</p>
+    <div class="toggles" id="end"></div>
+    <div class="scene" id="s2"></div>
+    <p class="big" id="lab2"></p>
+    <p class="note" style="margin-top:6px">→ 커밋 전 변경은 "나만 보는 초안" — 남이 그걸 보면 사고(다음 챕터의 dirty read).</p>
+  </section>
+
+  <!-- STEP 3 -->
+  <section class="panel" data-panel="3">
+    <span class="kicker" style="color:var(--good)">Step 03 — Takeaways</span>
+    <h2>정리</h2>
+    <p class="lead"><b>트랜잭션</b> = 여러 작업을 한 덩어리로. <b>원자성</b>으로 전부 아니면 전무(커밋/롤백)라 중간 깨짐이 없고, 커밋 전 변경은 <b>나만 보는 임시 상태</b>예요. 성질은 <b>ACID</b>로 부르고, 이 PART는 <b>A(원자성)</b>와 <b>I(격리)</b>에 집중해요(D는 CH14). 그런데 트랜잭션이 <b>하나만</b> 돌 땐 깔끔하지만, <b>여럿이 동시에</b> 같은 데이터를 건드리기 시작하면 — 커밋 안 한 값을 남이 보거나, 읽는 사이 값이 바뀌는 — 사고가 나요. 그게 다음 챕터예요.</p>
+    <div class="scene" id="s3"></div>
+    <p class="big" id="lab3"></p>
+    <p class="note" style="margin-top:14px">→ 다음 → <a href="11-anomalies.html" style="color:var(--q);font-weight:700">CH 11 · 동시 실행의 위험</a></p>
+  </section>
+
+  <p class="foot">// 코드 없는 직관 입문 · <a href="index.html">목차</a></p>
+</div>
+
+<script src="shared/lib.js"></script>
+<script src="shared/lib-db.js"></script>
+<script>
+VZ.mountTopnav('#topnav', '10 · 트랜잭션·ACID');
+VZ.setupStepper();
+const DB=VZ.DB, clamp=VZ.clamp;
+
+// ===== STEP 0: atomicity transfer =====
+(function(){ let mode=0, cancel=null;
+  const el=document.getElementById('mode'); el.innerHTML=`<button data-i="0">정상 (커밋)</button><button data-i="1">중간 실패 (롤백)</button>`;
+  function frame(p){ const W=460,H=170; let s='';
+    // A balance: 100 -> 90 ; B: 50 -> 60. fail mode: A drops then rollback restores
+    let aBal=100, bBal=50, note='', noteCol='var(--muted)';
+    if(mode===0){ if(p>0.33) aBal=90; if(p>0.66){ bBal=60; } note = p<0.33?'트랜잭션 시작':p<0.66?'A에서 -10':p<0.95?'B에 +10':'커밋 ✓ 합계 보존(150)'; noteCol = p>=0.95?'var(--good)':'var(--muted)'; }
+    else { if(p>0.33&&p<0.8) aBal=90; if(p>=0.8) aBal=100; note = p<0.33?'트랜잭션 시작':p<0.6?'A에서 -10':p<0.8?'✗ 사고 발생! (B 더하기 전)':'롤백 — A 되돌림(100). 증발 없음'; noteCol = (p>=0.6&&p<0.8)?'var(--drop)':(p>=0.8?'var(--good)':'var(--muted)'); }
+    s+=DB.ledger(60,30,340,['계좌','잔액'],[{cells:['A',aBal], state: (mode===1&&p>=0.6&&p<0.8)?'abort':(aBal!==100?'active':'')},{cells:['B',bBal], state: bBal!==50?'ok':''}],{rh:30});
+    s+=`<text x="${W/2}" y="130" text-anchor="middle" font-size="12" font-family="monospace" fill="${noteCol}" font-weight="700">${note}</text>`;
+    s+=`<text x="${W/2}" y="152" text-anchor="middle" font-size="10" font-family="monospace" fill="var(--muted)">합계: ${aBal+bBal} — 원자성 덕에 일관성(150)이 안 깨짐</text>`;
+    document.getElementById('s0').innerHTML=DB.svg(W,H,s,'원자성');
+    if(p>=1) document.getElementById('lab0').innerHTML = mode===0?'<b style="color:var(--good)">커밋</b>: 둘 다 반영, 합계 150 보존.':'<b style="color:var(--good)">롤백</b>: 사고 시 A를 되돌려 합계 150 유지 — 돈 증발 없음.';
+    else document.getElementById('lab0').textContent='재생 중…';
+  }
+  document.getElementById('go0').onclick=()=>{ if(cancel)cancel(); cancel=VZ.LA.tween(p=>frame(p),2600,()=>frame(1)); };
+  el.addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b)return; mode=+b.dataset.i; el.querySelectorAll('button').forEach((x,i)=>{const on=i===mode;x.classList.toggle('on',on);x.style.background=on?(i===0?'var(--good)':'var(--drop)'):'var(--panel-2)';x.style.color=on?'#0b0e14':'var(--muted)';}); frame(1); });
+  el.querySelector('button').classList.add('on'); el.querySelector('button').style.background='var(--good)'; el.querySelector('button').style.color='#0b0e14';
+  frame(1);
+})();
+
+// ===== STEP 1: ACID =====
+(function(){ let sel=0;
+  const A=[
+    {k:'A · 원자성',c:'var(--hot)',d:'전부 성공(커밋)하거나 전부 없던 일(롤백). 중간 상태 없음.',star:true},
+    {k:'C · 일관성',c:'var(--q)',d:'규칙(제약)을 지킨 상태→지킨 상태로만. 나머지 셋의 결과.',star:false},
+    {k:'I · 격리',c:'var(--hot)',d:'여럿이 동시에 돌아도 서로 안 꼬이게. 이 PART의 핵심(11~13).',star:true},
+    {k:'D · 내구성',c:'var(--good)',d:'커밋했으면 정전이 나도 안 사라짐. CH14에서.',star:false},
+  ];
+  const el=document.getElementById('acid'); el.innerHTML=A.map((a,i)=>`<button data-i="${i}">${a.k}</button>`).join('');
+  function render(){ const W=460,H=130; const a=A[sel]; let s='';
+    s+=`<rect x="16" y="16" width="${W-32}" height="${H-32}" rx="12" fill="var(--panel)" stroke="${a.c}"/>`;
+    s+=`<text x="34" y="48" fill="${a.c}" font-size="16" font-family="monospace" font-weight="700">${a.k}${a.star?'  ★ 이 PART 주인공':''}</text>`;
+    s+=`<foreignObject x="34" y="60" width="${W-68}" height="56"><div xmlns="http://www.w3.org/1999/xhtml" style="font-family:monospace;font-size:12.5px;line-height:1.6;color:#cdd6f4">${a.d}</div></foreignObject>`;
+    document.getElementById('s1').innerHTML=DB.svg(W,H,s,a.k);
+    document.querySelectorAll('#acid button').forEach((b,i)=>{ const on=i===sel; b.classList.toggle('on',on); b.style.background=on?A[i].c:'var(--panel-2)'; b.style.color=on?'#0b0e14':'var(--muted)'; });
+    document.getElementById('lab1').innerHTML = `<b style="color:${a.c}">${a.k}</b>${a.star?' — 이 PART에서 깊이 다뤄요':' — 가볍게/뒤에서'}`;
+  }
+  el.addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b)return; sel=+b.dataset.i; render(); });
+  render();
+})();
+
+// ===== STEP 2: commit vs rollback timeline =====
+(function(){ let mode=0;
+  const el=document.getElementById('end'); el.innerHTML=`<button data-i="0">커밋</button><button data-i="1">롤백</button>`;
+  function render(){ const W=460,H=110;
+    const ops = mode===0?[
+      {lane:'T',t0:0,dur:0.2,label:'BEGIN',kind:'read'},
+      {lane:'T',t0:0.2,dur:0.5,label:'변경(나만 봄)',kind:'write'},
+      {lane:'T',t0:0.7,dur:0.3,label:'COMMIT(확정·공개)',kind:'commit'},
+    ]:[
+      {lane:'T',t0:0,dur:0.2,label:'BEGIN',kind:'read'},
+      {lane:'T',t0:0.2,dur:0.5,label:'변경(나만 봄)',kind:'write'},
+      {lane:'T',t0:0.7,dur:0.3,label:'ROLLBACK(무효)',kind:'abort'},
+    ];
+    let s=DB.txTimeline(W,H,['T'],ops,1.0,{tick:0.5,padL:30});
+    document.getElementById('s2').innerHTML=DB.svg(W,H,s,mode===0?'커밋':'롤백');
+    document.querySelectorAll('#end button').forEach((b,i)=>{ const on=i===mode; b.classList.toggle('on',on); b.style.background=on?(i===0?'var(--good)':'var(--drop)'):'var(--panel-2)'; b.style.color=on?'#0b0e14':'var(--muted)'; });
+    document.getElementById('lab2').innerHTML = mode===0?'<b style="color:var(--good)">커밋</b>: 변경이 한꺼번에 확정·공개돼요.':'<b style="color:var(--drop)">롤백</b>: 변경이 전부 없던 일 — 아무도 못 봤죠.';
+  }
+  el.addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b)return; mode=+b.dataset.i; render(); });
+  render();
+})();
+
+// ===== STEP 3 =====
+(function(){ const W=460,H=110;
+  let s=`<text x="${W/2}" y="26" fill="var(--hot)" font-size="12.5" font-family="monospace" text-anchor="middle" font-weight="700">트랜잭션 = "한 덩어리로 취급"</text>`;
+  const rows=[['원자성(A)','전부 아니면 전무 · 커밋/롤백','var(--hot)'],['격리(I)','동시에 돌아도 안 꼬이게 → 다음 챕터','var(--q)']];
+  rows.forEach((r,i)=>{ const y=42+i*30; s+=`<rect x="20" y="${y}" width="${W-40}" height="25" rx="6" fill="var(--panel)" stroke="${r[2]}" stroke-width="1.1"/><text x="34" y="${y+16.5}" fill="${r[2]}" font-size="11" font-family="monospace" font-weight="700">${r[0]}</text><text x="${W-34}" y="${y+16.5}" fill="var(--ink)" font-size="9.5" font-family="monospace" text-anchor="end">${r[1]}</text>`; });
+  document.getElementById('s3').innerHTML=DB.svg(W,H,s,'정리');
+  document.getElementById('lab3').innerHTML='하나만 돌 땐 깔끔 — 여럿이 동시에 건드리면? <b style="color:var(--q)">동시 실행의 위험</b>.';
+})();
+</script>
+</body>
+</html>

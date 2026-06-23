@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>14 · WAL · 내구성 — 데이터베이스, 눈으로 보기</title>
+<link rel="stylesheet" href="shared/theme.css">
+<link rel="icon" type="image/svg+xml" href="shared/favicon.svg">
+<style>
+  .big{font-family:'JetBrains Mono',monospace; font-size:14px; color:var(--ink); margin:8px 2px 0;}
+  .ctl{display:flex; align-items:center; gap:10px; margin:10px 0; flex-wrap:wrap;}
+  svg{display:block; width:100%;}
+  .toggles{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
+  .toggles button{font-family:'JetBrains Mono',monospace;font-size:12px;padding:7px 12px;border-radius:8px;background:var(--panel-2);border:1px solid var(--line);color:var(--muted);cursor:pointer}
+  .toggles button.on{color:#0b0e14;font-weight:700}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topnav" id="topnav"></div>
+
+  <header>
+    <div class="tag" style="color:var(--good)">PART E · 내구성과 확장 — CH 14</div>
+    <h1>WAL · 내구성</h1>
+    <p class="intro">ACID의 마지막 글자 <b>D(내구성)</b>: "<b>커밋했으면 정전이 나도 사라지지 않는다</b>". 그런데 변경된 데이터 페이지를 매번 디스크에 즉시 쓰는 건 너무 느려요(랜덤 쓰기). 그렇다고 메모리에만 두면 정전 때 날아가죠. 해법이 <b>WAL(Write-Ahead Log, 미리 쓰는 로그)</b>이에요. 핵심 규칙: <b>데이터를 바꾸기 전에, 무엇을 바꿀지 먼저 로그에 적는다</b>. 로그는 <b>순차로 줄줄 쓰는</b> 작은 기록이라 빠르고, <b>커밋 = 로그를 디스크에 확실히 기록(flush)</b>하는 순간이에요. 실제 데이터 페이지는 <b>나중에 여유롭게</b> 디스크로 내려가요. 그래서 정전이 나도 — 로그만 있으면 다시 켤 때 <b>재생</b>해서 복구해요: 커밋됐는데 데이터에 아직 안 반영된 건 <b>다시 적용(redo)</b>, 커밋 안 했는데 데이터 페이지엔 흘러간 건 <b>되돌리기(undo)</b>. "로그 먼저, 데이터 나중"이 내구성의 비밀이에요.</p>
+  </header>
+
+  <nav class="stepper" id="stepper">
+    <button data-s="0" class="active">00 · 커밋 후 정전</button>
+    <button data-s="1">01 · 로그 먼저</button>
+    <button data-s="2">02 · 복구 (redo · undo)</button>
+    <button data-s="3">03 · 정리</button>
+  </nav>
+
+  <!-- STEP 0 -->
+  <section class="panel show" data-panel="0">
+    <span class="kicker" style="color:var(--hot)">Step 00 — Crash After Commit</span>
+    <h2>커밋했는데, 디스크엔 아직</h2>
+    <p class="lead">변경은 일단 메모리(버퍼풀)에서 일어나요 — 빠르니까. 문제는 커밋 직후 <b>데이터 페이지가 디스크로 내려가기 전에</b> 정전이 나면? 버튼으로 비교하세요. <b>로그 없음</b>: 메모리의 변경이 통째로 증발 → 커밋한 게 사라짐(내구성 깨짐). <b>로그 있음</b>: 변경을 미리 로그에 적어 뒀으니, 다시 켤 때 로그로 되살려요. 데이터 페이지를 즉시 안 써도 안전한 거죠.</p>
+    <div class="toggles" id="log"></div>
+    <div class="scene" id="s0"></div>
+    <p class="big" id="lab0"></p>
+    <p class="note" style="margin-top:6px">→ 데이터 페이지 디스크 쓰기는 느려서 미뤄요 — 대신 작은 로그를 먼저 안전하게.</p>
+  </section>
+
+  <!-- STEP 1 -->
+  <section class="panel" data-panel="1">
+    <span class="kicker" style="color:var(--q)">Step 01 — Log First</span>
+    <h2>작고 빠른 로그를 먼저 굳힌다</h2>
+    <p class="lead">WAL의 순서를 보세요. ① 변경 내용을 <b>로그에 순차로</b> 적고(작고 빠름), ② <b>커밋 = 그 로그를 디스크에 flush</b>(이 순간 내구성 확보), ③ 실제 데이터 페이지는 <b>나중에 여유롭게</b> 디스크로. 핵심은 <b>"데이터보다 로그가 먼저 디스크에 닿는다"</b> — 그래서 어느 시점에 죽어도 로그만 보면 뭘 해야 할지 알아요. 로그는 한 줄로 이어 쓰니(순차) 랜덤 데이터 쓰기보다 훨씬 싸요.</p>
+    <div class="ctl"><button class="btn play" id="go1">▶ 재생</button></div>
+    <div class="scene" id="s1"></div>
+    <p class="big" id="lab1"></p>
+    <p class="note" style="margin-top:6px">→ 커밋 = "로그가 디스크에 확실히 적힘". 데이터 반영은 그 뒤 천천히.</p>
+  </section>
+
+  <!-- STEP 2 -->
+  <section class="panel" data-panel="2">
+    <span class="kicker" style="color:var(--v)">Step 02 — Recovery</span>
+    <h2>다시 켤 때: redo와 undo</h2>
+    <p class="lead">왜 두 방향의 복구가 필요할까요? 성능 때문에 엔진은 ① <b>커밋한 변경도 데이터 페이지엔 아직 안 내려갔을</b> 수 있고(no-force), ② <b>커밋 안 한 변경이 데이터 페이지엔 먼저 흘러갔을</b> 수도 있어요(steal). 그래서 복구 때 로그를 보고 두 가지를 해요. 버튼으로 보세요. <b>redo</b>: 로그엔 커밋됐는데 데이터엔 없는 변경 → <b>다시 적용</b>. <b>undo</b>: 로그에 커밋 기록이 없는데 데이터엔 흘러간 변경 → <b>되돌리기</b>. 이 둘이면 어떤 시점에 죽어도 깔끔히 복구돼요.</p>
+    <div class="toggles" id="rec"></div>
+    <div class="scene" id="s2"></div>
+    <p class="big" id="lab2"></p>
+    <p class="note" style="margin-top:6px">→ redo=커밋된 것 살리기, undo=미커밋 흘러간 것 지우기. 로그가 둘 다의 근거예요.</p>
+  </section>
+
+  <!-- STEP 3 -->
+  <section class="panel" data-panel="3">
+    <span class="kicker" style="color:var(--good)">Step 03 — Takeaways</span>
+    <h2>정리</h2>
+    <p class="lead"><b>WAL</b> = "데이터보다 로그를 먼저 디스크에". 로그는 작고 순차라 빠르고, <b>커밋 = 로그 flush</b>가 내구성을 보장해요. 실제 데이터 쓰기는 미뤄도 돼요 — 정전이 나면 로그를 재생해 <b>redo</b>(커밋된 것 다시 적용)·<b>undo</b>(미커밋 흘러간 것 되돌림)로 복구하니까요. (로그가 무한히 길어지지 않게 주기적으로 <b>체크포인트</b>로 "여기까진 데이터에 반영됨"을 찍어요.) 이로써 한 대의 데이터베이스 이야기를 마쳐요. 다음엔 한 대를 넘어 — 복제와 샤딩으로 규모를 키워요.</p>
+    <div class="scene" id="s3"></div>
+    <p class="big" id="lab3"></p>
+    <p class="note" style="margin-top:14px">→ 다음 → <a href="15-replication.html" style="color:var(--q);font-weight:700">CH 15 · 복제 · 샤딩</a></p>
+  </section>
+
+  <p class="foot">// 코드 없는 직관 입문 · <a href="index.html">목차</a></p>
+</div>
+
+<script src="shared/lib.js"></script>
+<script src="shared/lib-db.js"></script>
+<script>
+VZ.mountTopnav('#topnav', '14 · WAL·내구성');
+VZ.setupStepper();
+const DB=VZ.DB;
+
+// ===== STEP 0: crash after commit =====
+(function(){ let mode=1;
+  const el=document.getElementById('log'); el.innerHTML=`<button data-i="0">로그 없음</button><button data-i="1">로그 있음 (WAL)</button>`;
+  function render(){ const W=460,H=170; const safe=mode===1; let s='';
+    s+=`<text x="105" y="22" text-anchor="middle" font-size="10" font-family="monospace" fill="var(--q)" font-weight="700">메모리(버퍼풀)</text>`;
+    s+=DB.page(40,30,130,52,'데이터 변경', [{label:'잔액=500',state:'active'}], {color:'var(--q)'});
+    s+=`<text x="355" y="22" text-anchor="middle" font-size="10" font-family="monospace" fill="var(--muted)">디스크</text>`;
+    s+=DB.page(290,30,130,52,'데이터 페이지', [{label: safe?'(나중 반영)':'(비어 있음)'}], {color:'var(--line)', dash:'4 3'});
+    // log on disk if safe
+    if(safe){ s+=DB.walStrip(W,120,[{label:'잔액=500',state:'ok'},{label:'commit',state:'ok'}],{y:104}); }
+    else { s+=`<text x="${W/2}" y="120" text-anchor="middle" font-size="10" font-family="monospace" fill="var(--faint)">(로그 없음 — 메모리 변경만 존재)</text>`; }
+    // crash bolt + result
+    s+=`<text x="${W/2}" y="150" text-anchor="middle" font-size="12" font-family="monospace" fill="${safe?'var(--good)':'var(--drop)'}" font-weight="700">⚡정전! → ${safe?'로그로 복구 가능 ✓':'메모리 증발 → 커밋한 게 사라짐 ✗'}</text>`;
+    document.getElementById('s0').innerHTML=DB.svg(W,H,s,safe?'WAL':'로그없음');
+    document.querySelectorAll('#log button').forEach((b,i)=>{ const on=i===mode; b.classList.toggle('on',on); b.style.background=on?(i===0?'var(--drop)':'var(--good)'):'var(--panel-2)'; b.style.color=on?'#0b0e14':'var(--muted)'; });
+    document.getElementById('lab0').innerHTML = safe?'<b style="color:var(--good)">로그 있음</b>: 변경을 미리 로그에 굳혀, 정전 후 재생으로 복구.':'<b style="color:var(--drop)">로그 없음</b>: 디스크 반영 전 정전 → 커밋한 변경이 증발(내구성 깨짐).';
+  }
+  el.addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b)return; mode=+b.dataset.i; render(); });
+  render();
+})();
+
+// ===== STEP 1: log first (play) =====
+(function(){ let cancel=null; const W=460,H=160;
+  function frame(p){ let s='';
+    // 3 phases: log write (0-0.4), commit flush (0.4-0.6), data page write later (0.7-1)
+    const logState = p>0.1?'ok':'';
+    const commitState = p>0.45?'ok':(p>0.4?'active':'');
+    s+=DB.walStrip(W,80,[{label:'잔액=500',state:logState},{label:'commit',state:commitState}],{y:30});
+    // data page on disk, written late
+    s+=`<text x="100" y="108" text-anchor="middle" font-size="10" font-family="monospace" fill="var(--muted)">디스크 데이터 페이지</text>`;
+    s+=DB.page(40,116,120,34, p>0.7?'반영됨':'(아직 안 씀)', [], {color: p>0.7?'var(--q)':'var(--line)', dash:p>0.7?null:'4 3'});
+    let cap = p<0.4?'① 변경을 로그에 순차로 적는 중':p<0.65?'② 커밋 = 로그 flush(내구성 확보!)':p<0.85?'③ 데이터 페이지는 나중에 여유롭게':'완료 — 로그가 데이터보다 먼저 디스크에';
+    s+=`<text x="290" y="135" font-size="10.5" font-family="monospace" fill="${p>0.45?'var(--good)':'var(--hot)'}" font-weight="700">${cap}</text>`;
+    document.getElementById('s1').innerHTML=DB.svg(W,H,s,'로그먼저');
+    if(p>=1) document.getElementById('lab1').innerHTML='커밋 시점에 <b style="color:var(--good)">로그가 디스크에 확실히</b> — 데이터 페이지 쓰기는 그 뒤 천천히.';
+    else document.getElementById('lab1').textContent='재생 중…';
+  }
+  document.getElementById('go1').onclick=()=>{ if(cancel)cancel(); cancel=VZ.LA.tween(p=>frame(p),2800,()=>frame(1)); };
+  frame(1);
+})();
+
+// ===== STEP 2: recovery redo/undo =====
+(function(){ let mode=0;
+  const el=document.getElementById('rec'); el.innerHTML=`<button data-i="0">redo (커밋된 것 살리기)</button><button data-i="1">undo (미커밋 되돌리기)</button>`;
+  function render(){ const W=460,H=160; let s='';
+    if(mode===0){ // redo: log has commit, data page missing it
+      s+=DB.walStrip(W,80,[{label:'잔액=500',state:'ok'},{label:'commit',state:'ok'}],{y:30});
+      s+=`<text x="100" y="104" text-anchor="middle" font-size="10" font-family="monospace" fill="var(--muted)">디스크 데이터(크래시 직후)</text>`;
+      s+=DB.page(40,112,120,34,'잔액=100(옛값)',[],{color:'var(--drop)'});
+      s+=DB.edge(160,129,W-150,60,{color:'var(--good)',lw:1.8});
+      s+=`<text x="${W-90}" y="120" text-anchor="middle" font-size="11" font-family="monospace" fill="var(--good)" font-weight="700">로그 재생 → 500 다시 적용(redo)</text>`;
+    } else { // undo: log has NO commit, data page has the change
+      s+=DB.walStrip(W,80,[{label:'잔액=500',state:'ok'},{label:'commit?',state:''}],{y:30});
+      s+=`<text x="100" y="104" text-anchor="middle" font-size="10" font-family="monospace" fill="var(--muted)">디스크 데이터(크래시 직후)</text>`;
+      s+=DB.page(40,112,120,34,'잔액=500(흘러감)',[],{color:'var(--hot)'});
+      s+=DB.edge(160,129,W-150,60,{color:'var(--drop)',lw:1.8});
+      s+=`<text x="${W-90}" y="120" text-anchor="middle" font-size="11" font-family="monospace" fill="var(--drop)" font-weight="700">커밋 기록 없음 → 100으로 되돌림(undo)</text>`;
+    }
+    document.getElementById('s2').innerHTML=DB.svg(W,H,s,mode===0?'redo':'undo');
+    document.querySelectorAll('#rec button').forEach((b,i)=>{ const on=i===mode; b.classList.toggle('on',on); b.style.background=on?(i===0?'var(--good)':'var(--drop)'):'var(--panel-2)'; b.style.color=on?'#0b0e14':'var(--muted)'; });
+    document.getElementById('lab2').innerHTML = mode===0?'<b style="color:var(--good)">redo</b>: 로그엔 커밋됐는데 데이터엔 아직 → 다시 적용(no-force 때문).':'<b style="color:var(--drop)">undo</b>: 미커밋인데 데이터 페이지엔 흘러감 → 되돌리기(steal 때문).';
+  }
+  el.addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b)return; mode=+b.dataset.i; render(); });
+  render();
+})();
+
+// ===== STEP 3 =====
+(function(){ const W=460,H=110;
+  let s=`<text x="${W/2}" y="26" fill="var(--good)" font-size="12.5" font-family="monospace" text-anchor="middle" font-weight="700">로그 먼저, 데이터 나중 = 내구성</text>`;
+  const rows=[['커밋','= 로그를 디스크에 flush(이 순간 안전)','var(--q)'],['복구','redo(커밋된 것)·undo(미커밋) + 체크포인트','var(--v)']];
+  rows.forEach((r,i)=>{ const y=42+i*30; s+=`<rect x="20" y="${y}" width="${W-40}" height="25" rx="6" fill="var(--panel)" stroke="${r[2]}" stroke-width="1.1"/><text x="34" y="${y+16.5}" fill="${r[2]}" font-size="11" font-family="monospace" font-weight="700">${r[0]}</text><text x="${W-34}" y="${y+16.5}" fill="var(--ink)" font-size="9" font-family="monospace" text-anchor="end">${r[1]}</text>`; });
+  document.getElementById('s3').innerHTML=DB.svg(W,H,s,'정리');
+  document.getElementById('lab3').innerHTML='한 대 이야기 끝 — 이제 <b style="color:var(--q)">여러 대로(복제·샤딩)</b>.';
+})();
+</script>
+</body>
+</html>

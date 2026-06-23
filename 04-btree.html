@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>04 · B+tree — 데이터베이스, 눈으로 보기</title>
+<link rel="stylesheet" href="shared/theme.css">
+<link rel="icon" type="image/svg+xml" href="shared/favicon.svg">
+<style>
+  .big{font-family:'JetBrains Mono',monospace; font-size:14px; color:var(--ink); margin:8px 2px 0;}
+  .ctl{display:flex; align-items:center; gap:10px; margin:10px 0; flex-wrap:wrap;}
+  svg{display:block; width:100%;}
+  .toggles{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
+  .toggles button{font-family:'JetBrains Mono',monospace;font-size:12px;padding:7px 12px;border-radius:8px;background:var(--panel-2);border:1px solid var(--line);color:var(--muted);cursor:pointer}
+  .toggles button.on{color:#0b0e14;font-weight:700}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topnav" id="topnav"></div>
+
+  <header>
+    <div class="tag" style="color:var(--hot)">PART B · 인덱스 — CH 04</div>
+    <h1>B+tree</h1>
+    <p class="intro">정렬된 길잡이를 실제로 어떻게 만들까요? 그냥 정렬된 배열은 가운데를 집기 좋지만, 행을 하나 넣을 때마다 뒤를 다 밀어야 해 갱신이 끔찍해요. 그래서 엔진은 <b>트리</b>를 써요 — 단, 흔한 <b>이진 트리</b>가 아니라 <b>다진(多枝) 트리</b>를요. 왜냐면 트리를 한 칸 내려갈 때마다 <b>디스크를 한 번</b> 읽거든요. 이진 트리는 갈림길이 둘뿐이라 깊이가 깊고(디스크 읽기 많음), <b>B+tree</b>는 한 노드(=한 페이지)에 키를 <b>수백 개</b> 담아 갈림길이 수백 개라 — 수백만 행도 <b>두세 층</b>이면 닿아요. 게다가 B+tree는 <b>실제 데이터(또는 행 포인터)를 맨 아래 리프에만</b> 두고, 위 내부 노드는 순전히 <b>"어느 쪽으로 갈까"의 길잡이</b>예요. 그리고 리프들은 <b>정렬된 채 옆으로 연결</b>돼 있어요 — 이게 다음 챕터(범위 검색)의 비밀이에요.</p>
+  </header>
+
+  <nav class="stepper" id="stepper">
+    <button data-s="0" class="active">00 · 왜 다진 트리</button>
+    <button data-s="1">01 · 루트→리프 탐색</button>
+    <button data-s="2">02 · 구조 — 리프에만 데이터</button>
+    <button data-s="3">03 · 정리</button>
+  </nav>
+
+  <!-- STEP 0 -->
+  <section class="panel show" data-panel="0">
+    <span class="kicker" style="color:var(--hot)">Step 00 — Why Many-Way</span>
+    <h2>한 층 내려가면 디스크 한 번</h2>
+    <p class="lead">트리의 한 층 = 디스크 읽기 한 번이에요. 그래서 <b>깊이(층 수)를 줄이는 게 전부</b>예요. 슬라이더로 행 수를 키워 보세요. <b>이진 트리</b>(갈림길 2개)는 깊이가 빠르게 깊어져요. <b>B+tree</b>(한 노드에 키 수백 개 = 갈림길 수백 개)는 같은 데이터를 <b>훨씬 얕게</b> 담아요 — 100만 행도 단 3층이면 닿죠.</p>
+    <div class="ctl"><label>행 수 <span id="nL" style="color:var(--hot)">100만</span></label><input type="range" id="nv" min="3" max="9" step="1" value="6" style="flex:1;max-width:240px"></div>
+    <div class="scene" id="s0"></div>
+    <p class="big" id="lab0"></p>
+    <p class="note" style="margin-top:6px">→ 갈림길이 많을수록(높은 fanout) 트리가 얕아져요 — 디스크 읽기 = 깊이.</p>
+  </section>
+
+  <!-- STEP 1 -->
+  <section class="panel" data-panel="1">
+    <span class="kicker" style="color:var(--q)">Step 01 — Root to Leaf</span>
+    <h2>키를 따라 한 층씩 내려가기</h2>
+    <p class="lead">B+tree에서 <b>50</b>을 찾아요. ▶로 한 층씩 보세요. 루트에서 키 범위를 보고 <b>어느 자식으로 갈지</b> 정하고(내부 노드 = 길잡이), 한 층 내려가 다시 정하고, <b>리프</b>에 닿으면 실제 데이터를 찾아요. 층마다 디스크 한 번 — 이 작은 트리는 단 2번이면 닿죠. 굵은 화살표가 내려간 경로예요.</p>
+    <div class="ctl" id="bt-ctl"></div>
+    <div class="scene" id="s1"></div>
+    <p class="big" id="lab1"></p>
+    <p class="note" style="margin-top:6px">→ 내부 노드는 "방향만", 데이터는 리프에. 탐색 비용 = 트리 깊이(아주 작음).</p>
+  </section>
+
+  <!-- STEP 2 -->
+  <section class="panel" data-panel="2">
+    <span class="kicker" style="color:var(--v)">Step 02 — Data Only in Leaves</span>
+    <h2>데이터는 리프에, 리프는 정렬 연결</h2>
+    <p class="lead">B+tree의 두 가지 약속을 봐요. ① <b>실제 데이터(또는 행 포인터)는 맨 아래 리프에만</b> 있어요 — 위 내부 노드는 길잡이일 뿐, 같은 키가 위에 보여도 그건 "이 위쪽은 여기로" 안내판이에요. ② <b>리프끼리 정렬된 채 옆으로 연결</b>돼 있어요(점선). 그래서 한 리프에 닿은 뒤 <b>옆으로 죽 따라가면</b> 정렬된 순서대로 줄줄 읽혀요 — 다음 챕터의 범위 검색·정렬이 여기서 나와요.</p>
+    <div class="scene" id="s2"></div>
+    <p class="big" id="lab2"></p>
+    <p class="note" style="margin-top:6px">→ 내부=길잡이, 리프=데이터+정렬 연결. 데이터를 리프에만 두고 리프를 잇는 것 — 이게 'B+tree'를 일반 트리와 가르는 핵심이에요.</p>
+  </section>
+
+  <!-- STEP 3 -->
+  <section class="panel" data-panel="3">
+    <span class="kicker" style="color:var(--good)">Step 03 — Takeaways</span>
+    <h2>정리</h2>
+    <p class="lead"><b>B+tree</b>는 한 노드에 키를 수백 개 담아(높은 fanout) 트리를 <b>아주 얕게</b> 유지해요 — 수백만 행도 두세 층, 즉 디스크 읽기 두세 번이면 닿아요. 데이터는 <b>리프에만</b> 두고 내부 노드는 길잡이로 쓰며, 리프들은 <b>정렬된 채 연결</b>돼 있어요. 이게 거의 모든 데이터베이스 인덱스의 실제 모습이에요. 다음엔 이 연결된 리프가 빛나는 곳 — 범위 검색과 정렬 — 으로 가요.</p>
+    <div class="scene" id="s3"></div>
+    <p class="big" id="lab3"></p>
+    <p class="note" style="margin-top:14px">→ 다음 → <a href="05-range-sort.html" style="color:var(--q);font-weight:700">CH 05 · 범위 · 정렬에 쓰기</a></p>
+  </section>
+
+  <p class="foot">// 코드 없는 직관 입문 · <a href="index.html">목차</a></p>
+</div>
+
+<script src="shared/lib.js"></script>
+<script src="shared/lib-db.js"></script>
+<script>
+VZ.mountTopnav('#topnav', '04 · B+tree');
+VZ.setupStepper();
+const DB=VZ.DB, clamp=VZ.clamp;
+
+// ===== STEP 0: depth: binary vs B+tree =====
+(function(){ const vals=[1000,10000,100000,1000000,10000000,100000000,1000000000]; // not used directly
+  let e=6; const nv=document.getElementById('nv'), nL=document.getElementById('nL');
+  const LBL={3:'1천',4:'1만',5:'10만',6:'100만',7:'1천만',8:'1억',9:'10억'};
+  function render(){ const n=Math.pow(10,e); const W=460,H=160;
+    const binDepth=Math.ceil(Math.log2(n)); const fanout=100; const btDepth=Math.max(1,Math.ceil(Math.log(n)/Math.log(fanout)));
+    let s='';
+    s+=`<text x="120" y="24" text-anchor="middle" font-size="11" font-family="monospace" fill="var(--drop)" font-weight="700">이진 트리 (갈림길 2)</text>`;
+    s+=`<text x="340" y="24" text-anchor="middle" font-size="11" font-family="monospace" fill="var(--good)" font-weight="700">B+tree (갈림길 ~100)</text>`;
+    // depth bars (each layer = a stacked block)
+    const layerH=10, gap=3, topY=40;
+    for(let i=0;i<Math.min(binDepth,9);i++) s+=`<rect x="${120-40-i*4}" y="${topY+i*(layerH+gap)}" width="${80+i*8}" height="${layerH}" rx="2" fill="var(--drop)" opacity="0.85"/>`;
+    if(binDepth>9) s+=`<text x="120" y="${topY+9*(layerH+gap)+2}" text-anchor="middle" font-size="11" font-family="monospace" fill="var(--drop)">⋯ (그림 잘림)</text>`;
+    for(let i=0;i<btDepth;i++) s+=`<rect x="${340-40-i*10}" y="${topY+i*(layerH+gap)}" width="${80+i*20}" height="${layerH}" rx="2" fill="var(--good)" opacity="0.9"/>`;
+    s+=`<text x="120" y="${topY+Math.min(binDepth,9)*(layerH+gap)+18}" text-anchor="middle" font-size="13" font-family="monospace" fill="var(--drop)" font-weight="700">${binDepth}층</text>`;
+    s+=`<text x="340" y="${topY+btDepth*(layerH+gap)+18}" text-anchor="middle" font-size="13" font-family="monospace" fill="var(--good)" font-weight="700">${btDepth}층</text>`;
+    s+=`<text x="${W/2}" y="152" text-anchor="middle" font-size="10" font-family="monospace" fill="var(--muted)">${LBL[e]} 행 → 디스크 읽기: 이진 ${binDepth}번 vs B+tree ${btDepth}번</text>`;
+    document.getElementById('s0').innerHTML=DB.svg(W,H,s,'깊이비교'); nL.textContent=LBL[e];
+    document.getElementById('lab0').innerHTML = `${LBL[e]} 행: 이진 트리는 <b style="color:var(--drop)">${binDepth}층</b>(디스크 ${binDepth}번), B+tree는 <b style="color:var(--good)">${btDepth}층</b>(디스크 ${btDepth}번). 갈림길이 많아 얕아요.`;
+  }
+  nv.oninput=()=>{ e=+nv.value; render(); };
+  render();
+})();
+
+// ===== STEP 1: B+tree search (step player) =====
+(function(){
+  // 2-level B+tree, search 50
+  const baseNodes=()=>([
+    {id:'root',x:0.5,y:0.16,keys:['30','60'],leaf:false},
+    {id:'l1',x:0.18,y:0.72,keys:['10','20'],leaf:true},
+    {id:'l2',x:0.5,y:0.72,keys:['30','40','50'],leaf:true},
+    {id:'l3',x:0.82,y:0.72,keys:['60','70','90'],leaf:true},
+  ]);
+  const baseEdges=[{from:'root',to:'l1'},{from:'root',to:'l2'},{from:'root',to:'l3'}];
+  const rec=VZ.AL.recorder();
+  rec.snap({hlNode:'root',hlEdge:null,hlKey:{}},{note:'루트: 50은 30 이상, 60 미만 → 가운데 자식으로'});
+  rec.snap({hlNode:'root',hlEdge:'l2',hlKey:{}},{note:'가운데 포인터를 따라 한 층 내려감 (디스크 읽기 1)'});
+  rec.snap({hlNode:'l2',hlEdge:'l2',hlKey:{l2:2}},{note:'리프 도착: 키를 보며 50 발견 (디스크 읽기 2)'});
+  function render(fr){ const st=fr.state; const W=460,H=180;
+    const nodes=baseNodes().map(n=>({...n, hl:n.id===st.hlNode, hlKey: st.hlKey[n.id]!=null?st.hlKey[n.id]:undefined}));
+    const edges=baseEdges.map(e=>({...e, hl: e.to===st.hlEdge}));
+    let s=DB.btree(W,H,nodes,edges,{leafOrder:['l1','l2','l3']});
+    s+=`<text x="${W/2}" y="${H-4}" text-anchor="middle" font-size="9.5" font-family="monospace" fill="var(--muted)">50 찾기 · 내부=길잡이(파랑 테두리=리프)</text>`;
+    document.getElementById('s1').innerHTML=DB.svg(W,H,s,'B+tree 탐색');
+    const last=rec.frames.indexOf(fr)===rec.frames.length-1;
+    document.getElementById('lab1').innerHTML = last?'<b style="color:var(--good)">50 찾음</b> — 단 2층(디스크 2번). 행이 100만 개여도 3층이면 끝.':'키 범위를 보고 어느 자식으로 갈지 정하는 중…';
+  }
+  VZ.AL.transport('#bt-ctl', rec.frames, render, {interval:1100});
+})();
+
+// ===== STEP 2: structure — data in leaves, linked =====
+(function(){ const W=460,H=190;
+  const nodes=[
+    {id:'root',x:0.5,y:0.16,keys:['30','60'],leaf:false},
+    {id:'l1',x:0.18,y:0.7,keys:['10','20'],leaf:true},
+    {id:'l2',x:0.5,y:0.7,keys:['30','40','50'],leaf:true},
+    {id:'l3',x:0.82,y:0.7,keys:['60','70','90'],leaf:true},
+  ];
+  const edges=[{from:'root',to:'l1'},{from:'root',to:'l2'},{from:'root',to:'l3'}];
+  let s=DB.btree(W,H,nodes,edges,{leafOrder:['l1','l2','l3']});
+  s+=`<text x="${0.5*(W-40)+20}" y="18" text-anchor="middle" font-size="9" font-family="monospace" fill="var(--q)">내부 = 길잡이(방향만)</text>`;
+  s+=`<text x="${W/2}" y="${H-22}" text-anchor="middle" font-size="9.5" font-family="monospace" fill="var(--v)">리프끼리 정렬 연결(점선) → 옆으로 죽 읽으면 정렬 순서</text>`;
+  s+=`<text x="${W/2}" y="${H-6}" text-anchor="middle" font-size="9" font-family="monospace" fill="var(--muted)">데이터(행 포인터)는 리프에만 — 위 '30·60'은 안내판일 뿐</text>`;
+  document.getElementById('s2').innerHTML=DB.svg(W,H,s,'구조');
+  document.getElementById('lab2').innerHTML='① 데이터는 <b style="color:var(--v)">리프에만</b> ② 리프는 <b style="color:var(--v)">정렬 연결</b> — 이 연결이 범위 검색의 비밀.';
+})();
+
+// ===== STEP 3 =====
+(function(){ const W=460,H=110;
+  let s=`<text x="${W/2}" y="26" fill="var(--hot)" font-size="12.5" font-family="monospace" text-anchor="middle" font-weight="700">높은 fanout → 얕은 트리 → 디스크 2~3번</text>`;
+  const rows=[['내부 노드','길잡이(어느 쪽으로 갈까)','var(--q)'],['리프 노드','데이터 + 정렬 연결(범위 검색)','var(--v)']];
+  rows.forEach((r,i)=>{ const y=42+i*30; s+=`<rect x="20" y="${y}" width="${W-40}" height="25" rx="6" fill="var(--panel)" stroke="${r[2]}" stroke-width="1.1"/><text x="34" y="${y+16.5}" fill="${r[2]}" font-size="11" font-family="monospace" font-weight="700">${r[0]}</text><text x="${W-34}" y="${y+16.5}" fill="var(--ink)" font-size="9.5" font-family="monospace" text-anchor="end">${r[1]}</text>`; });
+  document.getElementById('s3').innerHTML=DB.svg(W,H,s,'정리');
+  document.getElementById('lab3').innerHTML='연결된 리프가 빛나는 곳 — <b style="color:var(--q)">범위 검색과 정렬</b>로.';
+})();
+</script>
+</body>
+</html>

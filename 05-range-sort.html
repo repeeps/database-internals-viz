@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>05 · 범위 · 정렬에 쓰기 — 데이터베이스, 눈으로 보기</title>
+<link rel="stylesheet" href="shared/theme.css">
+<link rel="icon" type="image/svg+xml" href="shared/favicon.svg">
+<style>
+  .big{font-family:'JetBrains Mono',monospace; font-size:14px; color:var(--ink); margin:8px 2px 0;}
+  .ctl{display:flex; align-items:center; gap:10px; margin:10px 0; flex-wrap:wrap;}
+  svg{display:block; width:100%;}
+  .toggles{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
+  .toggles button{font-family:'JetBrains Mono',monospace;font-size:12px;padding:7px 12px;border-radius:8px;background:var(--panel-2);border:1px solid var(--line);color:var(--muted);cursor:pointer}
+  .toggles button.on{color:#0b0e14;font-weight:700}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topnav" id="topnav"></div>
+
+  <header>
+    <div class="tag" style="color:var(--hot)">PART B · 인덱스 — CH 05</div>
+    <h1>범위 · 정렬에 쓰기</h1>
+    <p class="intro">인덱스가 단순히 "한 값 콕 찾기"에만 좋은 건 아니에요. B+tree의 <b>정렬 연결된 리프</b> 덕분에 훨씬 더 많은 걸 공짜로 얻어요. ① <b>범위 검색</b>("30 이상 60 이하"): 시작 값이 든 리프를 한 번 찾은 뒤, <b>옆으로 연결된 리프를 죽 따라가면</b> 끝값까지 정렬된 채로 줄줄 나와요. ② <b>정렬(ORDER BY)</b>: 인덱스는 <b>이미 정렬돼</b> 있으니, 정렬 단계를 통째로 건너뛰고 인덱스 순서대로 읽기만 하면 돼요. ③ <b>복합 인덱스</b>(여러 열을 묶은 인덱스, 예: 성+이름): 사전이 성으로 먼저 정렬되듯, <b>왼쪽 열부터</b> 써야 효력이 있어요 — 성만으로도, 성+이름으로도 빠르지만 <b>이름만으로는</b> 못 써요(좌측 접두 규칙). 같은 인덱스라도 <b>질문의 모양</b>에 따라 쓸 수 있고 없고가 갈려요.</p>
+  </header>
+
+  <nav class="stepper" id="stepper">
+    <button data-s="0" class="active">00 · 범위 검색</button>
+    <button data-s="1">01 · 정렬은 공짜</button>
+    <button data-s="2">02 · 복합 인덱스 · 좌측 접두</button>
+    <button data-s="3">03 · 정리</button>
+  </nav>
+
+  <!-- STEP 0 -->
+  <section class="panel show" data-panel="0">
+    <span class="kicker" style="color:var(--hot)">Step 00 — Range Scan</span>
+    <h2>시작점 하나 찾고, 옆으로 죽</h2>
+    <p class="lead">"키가 <b>30 이상 60 이하</b>인 행"을 찾아요. ▶로 보세요 — 먼저 트리를 타고 내려가 시작값(30)이 든 리프를 찾고(딱 한 번의 트리 탐색), 그다음은 <b>연결된 리프를 옆으로 따라가며</b> 60을 넘을 때까지 줄줄 읽어요. 풀스캔처럼 전부 보지 않고, 필요한 구간만 정확히 훑죠. 굵게 표시된 리프가 읽은 범위예요.</p>
+    <div class="ctl" id="rg-ctl"></div>
+    <div class="scene" id="s0"></div>
+    <p class="big" id="lab0"></p>
+    <p class="note" style="margin-top:6px">→ 범위 검색 = 트리 탐색 1번 + 리프 연결 따라가기. B+tree의 "+"(리프 연결)가 빛나는 순간.</p>
+  </section>
+
+  <!-- STEP 1 -->
+  <section class="panel" data-panel="1">
+    <span class="kicker" style="color:var(--q)">Step 01 — Sort for Free</span>
+    <h2>정렬을 건너뛴다</h2>
+    <p class="lead">"이름순으로 정렬해서 보여줘"(ORDER BY). 버튼으로 비교하세요. <b>인덱스 없음</b>: 데이터를 다 모은 뒤 <b>따로 정렬</b>하는 단계가 필요해요(시간·메모리 듦). <b>인덱스 있음</b>: 인덱스가 <b>이미 그 순서로 정렬돼</b> 있으니, 정렬 단계를 통째로 건너뛰고 인덱스를 순서대로 읽기만 하면 끝. 정렬이 공짜가 돼요.</p>
+    <div class="toggles" id="ob"></div>
+    <div class="scene" id="s1"></div>
+    <p class="big" id="lab1"></p>
+    <p class="note" style="margin-top:6px">→ 인덱스 순서 = 원하는 정렬 순서이면, "정렬" 연산 자체가 사라져요.</p>
+  </section>
+
+  <!-- STEP 2 -->
+  <section class="panel" data-panel="2">
+    <span class="kicker" style="color:var(--v)">Step 02 — Composite · Left-Prefix</span>
+    <h2>복합 인덱스는 왼쪽부터</h2>
+    <p class="lead"><b>(성, 이름)</b>으로 묶은 복합 인덱스가 있어요 — 전화번호부처럼 성으로 먼저 정렬되고, 같은 성 안에서 이름으로 정렬돼요. 각 질문을 눌러 쓸 수 있는지 보세요. <b>성='김'</b>: ✓(맨 앞에서 모임). <b>성='김' 그리고 이름='철수'</b>: ✓(접두 그대로). <b>이름='철수'만</b>: ✗ — 이름만으론 인덱스 전체에 흩어져 있어 못 써요(전화번호부에서 이름만으론 못 찾듯). <b>왼쪽 열부터</b> 이어 써야 효력이 있어요.</p>
+    <div class="toggles" id="cmp"></div>
+    <div class="scene" id="s2"></div>
+    <p class="big" id="lab2"></p>
+    <p class="note" style="margin-top:6px">→ 좌측 접두 규칙: (A,B,C) 인덱스는 A / A,B / A,B,C엔 쓰지만 B나 C 단독엔 못 써요.</p>
+  </section>
+
+  <!-- STEP 3 -->
+  <section class="panel" data-panel="3">
+    <span class="kicker" style="color:var(--good)">Step 03 — Takeaways</span>
+    <h2>정리</h2>
+    <p class="lead">정렬된 연결 리프 덕에 인덱스는 <b>한 값 찾기</b>를 넘어 <b>범위 검색</b>(시작점 + 옆으로 따라가기)과 <b>정렬 건너뛰기</b>(이미 정렬됨)까지 줘요. <b>복합 인덱스</b>는 <b>왼쪽 열부터</b> 써야 효력이 있고요(좌측 접두). 같은 인덱스도 질문의 모양에 따라 쓰이고 안 쓰여요 — 그래서 "어떤 인덱스를, 어떤 순서로" 만들지가 설계의 핵심이에요. 그런데 인덱스는 공짜가 아니에요. 다음엔 그 대가를 봐요.</p>
+    <div class="scene" id="s3"></div>
+    <p class="big" id="lab3"></p>
+    <p class="note" style="margin-top:14px">→ 다음 → <a href="06-index-cost.html" style="color:var(--q);font-weight:700">CH 06 · 인덱스의 비용 · 모양</a></p>
+  </section>
+
+  <p class="foot">// 코드 없는 직관 입문 · <a href="index.html">목차</a></p>
+</div>
+
+<script src="shared/lib.js"></script>
+<script src="shared/lib-db.js"></script>
+<script>
+VZ.mountTopnav('#topnav', '05 · 범위·정렬');
+VZ.setupStepper();
+const DB=VZ.DB, clamp=VZ.clamp;
+
+// ===== STEP 0: range scan (step player) =====
+(function(){
+  const baseNodes=()=>([
+    {id:'root',x:0.5,y:0.16,keys:['30','60'],leaf:false},
+    {id:'l1',x:0.18,y:0.72,keys:['10','20'],leaf:true},
+    {id:'l2',x:0.5,y:0.72,keys:['30','40','50'],leaf:true},
+    {id:'l3',x:0.82,y:0.72,keys:['60','70','90'],leaf:true},
+  ]);
+  const baseEdges=[{from:'root',to:'l1'},{from:'root',to:'l2'},{from:'root',to:'l3'}];
+  const rec=VZ.AL.recorder();
+  rec.snap({hlNode:'root',hlEdge:'l2',leaves:[],hlKey:{}},{note:'트리 탐색 1번: 시작값 30이 든 리프로 내려감'});
+  rec.snap({hlNode:'l2',hlEdge:'l2',leaves:['l2'],hlKey:{}},{note:'리프 l2 도착: 30·40·50 모두 범위 안 → 읽기'});
+  rec.snap({hlNode:'l3',hlEdge:null,leaves:['l2'],hlKey:{l3:0}},{note:'연결 따라 옆 리프 l3으로: 60은 범위 안(읽음), 70은 넘음 → 멈춤(70·90 안 읽음)'});
+  function render(fr){ const st=fr.state; const W=460,H=180;
+    const nodes=baseNodes().map(n=>({...n, hl: n.id===st.hlNode || st.leaves.includes(n.id), hlKey: st.hlKey?st.hlKey[n.id]:undefined }));
+    const edges=baseEdges.map(e=>({...e, hl:e.to===st.hlEdge}));
+    let s=DB.btree(W,H,nodes,edges,{leafOrder:['l1','l2','l3']});
+    s+=`<text x="${W/2}" y="${H-4}" text-anchor="middle" font-size="9.5" font-family="monospace" fill="var(--muted)">30 이상 60 이하 · 굵은 리프=전부 읽음, 강조 칸=마지막 읽은 값(70에서 멈춤)</text>`;
+    document.getElementById('s0').innerHTML=DB.svg(W,H,s,'범위검색');
+    const last=rec.frames.indexOf(fr)===rec.frames.length-1;
+    document.getElementById('lab0').innerHTML = last?'<b style="color:var(--good)">30·40·50·60</b> 읽음 — 트리 탐색 1번 + 리프 2칸. 풀스캔처럼 전부 안 봐요.':'시작점을 찾고 옆으로 따라가는 중…';
+  }
+  VZ.AL.transport('#rg-ctl', rec.frames, render, {interval:1100});
+})();
+
+// ===== STEP 1: order by free =====
+(function(){ let mode=1;
+  const el=document.getElementById('ob'); el.innerHTML=`<button data-i="0">인덱스 없음</button><button data-i="1">인덱스 있음</button>`;
+  function render(){ const W=460,H=160; let s='';
+    if(mode===0){ // gather then sort
+      s+=DB.box(20,40,90,36,'데이터',{color:'var(--q)',fs:11,sub:'뒤섞임'});
+      s+=DB.edge(110,58,150,58,{color:'var(--hot)',lw:1.6});
+      s+=DB.box(150,40,120,36,'정렬 단계',{color:'var(--hot)',fs:11,sub:'시간·메모리'});
+      s+=DB.edge(270,58,310,58,{color:'var(--hot)',lw:1.6});
+      s+=DB.box(310,40,120,36,'정렬된 결과',{color:'var(--good)',fs:11});
+      s+=`<text x="${W/2}" y="110" fill="var(--drop)" font-size="11" font-family="monospace" text-anchor="middle" font-weight="700">추가 '정렬' 연산이 필요 (느림)</text>`;
+    } else {
+      s+=DB.box(20,40,140,36,'인덱스 (이미 정렬)',{color:'var(--v)',fs:11});
+      s+=DB.edge(160,58,230,58,{color:'var(--good)',lw:1.6});
+      s+=DB.box(230,40,200,36,'순서대로 읽기 → 결과',{color:'var(--good)',fs:11});
+      s+=`<text x="${W/2}" y="110" fill="var(--good)" font-size="11" font-family="monospace" text-anchor="middle" font-weight="700">'정렬' 연산을 통째로 건너뜀 (공짜)</text>`;
+    }
+    document.getElementById('s1').innerHTML=DB.svg(W,H,s,mode===0?'정렬필요':'정렬공짜');
+    document.querySelectorAll('#ob button').forEach((b,i)=>{ const on=i===mode; b.classList.toggle('on',on); b.style.background=on?(i===0?'var(--drop)':'var(--good)'):'var(--panel-2)'; b.style.color=on?'#0b0e14':'var(--muted)'; });
+    document.getElementById('lab1').innerHTML = mode===0?'<b style="color:var(--drop)">인덱스 없음</b>: 모아서 따로 정렬 — 추가 비용.':'<b style="color:var(--good)">인덱스 있음</b>: 이미 정렬돼 있어 그냥 순서대로 읽기.';
+  }
+  el.addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b)return; mode=+b.dataset.i; render(); });
+  render();
+})();
+
+// ===== STEP 2: composite index / left-prefix =====
+(function(){ let q=0;
+  const QS=[{k:"성='김'",ok:true,why:'맨 앞 열 → 정렬돼 모여 있음'},{k:"성='김' 그리고 이름='철수'",ok:true,why:'왼쪽부터 이어 씀 → 접두 일치'},{k:"이름='철수'만",ok:false,why:'왼쪽(성)을 건너뜀 → 인덱스 전체에 흩어짐'}];
+  const el=document.getElementById('cmp'); el.innerHTML=QS.map((x,i)=>`<button data-i="${i}">${x.k}</button>`).join('');
+  // index entries sorted by (성,이름)
+  const entries=[['강','민'],['강','철'],['김','나'],['김','철'],['박','수'],['박','철']];
+  function render(){ const W=460,H=170; const cur=QS[q]; let s='';
+    s+=`<text x="${W/2}" y="20" text-anchor="middle" font-size="10" font-family="monospace" fill="var(--v)" font-weight="700">인덱스 정렬 순서: (성, 이름)</text>`;
+    const cw=64,x0=24,y=34;
+    entries.forEach((e,i)=>{ let hit=false;
+      if(q===0) hit = e[0]==='김';
+      else if(q===1) hit = e[0]==='김'&&e[1]==='철';
+      else hit = e[1]==='철'; // 이름만 — 흩어짐
+      s+=DB.cell(x0+i*(cw+4),y,cw,30,`${e[0]}·${e[1]}`,{fill:hit?(cur.ok?'var(--good)':'var(--drop)'):'var(--panel)',tcol:hit?'#0b0e14':'var(--ink)',fs:10.5,bold:hit}); });
+    if(cur.ok) s+=`<text x="${W/2}" y="98" fill="var(--good)" font-size="11" font-family="monospace" text-anchor="middle" font-weight="700">✓ 연속 구간에 모여 있어 인덱스로 바로 점프</text>`;
+    else s+=`<text x="${W/2}" y="98" fill="var(--drop)" font-size="11" font-family="monospace" text-anchor="middle" font-weight="700">✗ 여기저기 흩어져 인덱스 무용 → 풀스캔</text>`;
+    s+=`<text x="${W/2}" y="124" fill="var(--muted)" font-size="10" font-family="monospace" text-anchor="middle">${cur.why}</text>`;
+    document.getElementById('s2').innerHTML=DB.svg(W,H,s,'복합인덱스');
+    document.querySelectorAll('#cmp button').forEach((b,i)=>{ const on=i===q; b.classList.toggle('on',on); b.style.background=on?(QS[i].ok?'var(--good)':'var(--drop)'):'var(--panel-2)'; b.style.color=on?'#0b0e14':'var(--muted)'; });
+    document.getElementById('lab2').innerHTML = cur.ok?`<b style="color:var(--good)">${cur.k}</b>: 쓸 수 있어요 — 왼쪽부터 이어 썼으니까.`:`<b style="color:var(--drop)">${cur.k}</b>: 못 써요 — 왼쪽(성)을 건너뛰면 흩어져요.`;
+  }
+  el.addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b)return; q=+b.dataset.i; render(); });
+  render();
+})();
+
+// ===== STEP 3 =====
+(function(){ const W=460,H=130;
+  let s=`<text x="${W/2}" y="26" fill="var(--hot)" font-size="12.5" font-family="monospace" text-anchor="middle" font-weight="700">정렬 연결 리프 = 범위 + 정렬 + (왼쪽부터)</text>`;
+  const rows=[['범위 검색','시작점 1번 + 옆 리프 따라가기','var(--good)'],['정렬','이미 정렬돼 ORDER BY 공짜','var(--v)'],['복합 인덱스','왼쪽 열부터 이어 써야 효력(좌측 접두)','var(--hot)']];
+  rows.forEach((r,i)=>{ const y=40+i*28; s+=`<rect x="20" y="${y}" width="${W-40}" height="23" rx="6" fill="var(--panel)" stroke="${r[2]}" stroke-width="1.1"/><text x="34" y="${y+15.5}" fill="${r[2]}" font-size="11" font-family="monospace" font-weight="700">${r[0]}</text><text x="${W-34}" y="${y+15.5}" fill="var(--ink)" font-size="9" font-family="monospace" text-anchor="end">${r[1]}</text>`; });
+  document.getElementById('s3').innerHTML=DB.svg(W,H,s,'정리');
+  document.getElementById('lab3').innerHTML='이 모든 게 공짜는 아니에요 — 다음엔 <b style="color:var(--q)">인덱스의 대가</b>.';
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>06 · 인덱스의 비용 · 모양 — 데이터베이스, 눈으로 보기</title>
+<link rel="stylesheet" href="shared/theme.css">
+<link rel="icon" type="image/svg+xml" href="shared/favicon.svg">
+<style>
+  .big{font-family:'JetBrains Mono',monospace; font-size:14px; color:var(--ink); margin:8px 2px 0;}
+  .ctl{display:flex; align-items:center; gap:10px; margin:10px 0; flex-wrap:wrap;}
+  svg{display:block; width:100%;}
+  .toggles{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
+  .toggles button{font-family:'JetBrains Mono',monospace;font-size:12px;padding:7px 12px;border-radius:8px;background:var(--panel-2);border:1px solid var(--line);color:var(--muted);cursor:pointer}
+  .toggles button.on{color:#0b0e14;font-weight:700}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topnav" id="topnav"></div>
+
+  <header>
+    <div class="tag" style="color:var(--hot)">PART B · 인덱스 — CH 06</div>
+    <h1>인덱스의 비용 · 모양</h1>
+    <p class="intro">인덱스는 읽기를 극적으로 빠르게 하지만 <b>공짜가 아니에요</b>. 인덱스는 "정렬된 사본"이라, 행을 <b>넣거나 고칠 때마다 인덱스도 같이 갱신</b>해 정렬을 유지해야 해요 — 인덱스가 많을수록 <b>쓰기가 느려지고</b> 디스크 공간도 더 써요. 게다가 모든 인덱스가 쓸모 있는 것도 아니에요: <b>카디널리티</b>(값의 다양함)가 낮은 열 — 예컨대 '성별'(값이 둘뿐) — 에 인덱스를 걸면, 인덱스를 타도 절반을 읽어야 해 풀스캔과 별 차이가 없어요. 마지막으로 인덱스에도 <b>모양</b>이 있어요: 인덱스가 행을 <b>가리키기만</b> 하는지(secondary — 찾은 뒤 본체로 한 번 더 점프), 인덱스가 <b>곧 행 자체</b>인지(clustered — 추가 점프 없음). 그리고 질문에 필요한 열이 <b>인덱스 안에 다 들어 있으면</b>(커버링 인덱스) 본체에 갈 필요조차 없어요. "인덱스를 건다"는 늘 <b>읽기 이득 ↔ 쓰기·공간 비용</b>의 저울질이에요.</p>
+  </header>
+
+  <nav class="stepper" id="stepper">
+    <button data-s="0" class="active">00 · 쓰기의 대가</button>
+    <button data-s="1">01 · 카디널리티</button>
+    <button data-s="2">02 · 인덱스의 모양</button>
+    <button data-s="3">03 · 정리</button>
+  </nav>
+
+  <!-- STEP 0 -->
+  <section class="panel show" data-panel="0">
+    <span class="kicker" style="color:var(--hot)">Step 00 — The Write Tax</span>
+    <h2>읽기를 사면 쓰기를 지불한다</h2>
+    <p class="lead">행 하나를 넣을 때, 본체 테이블에만 쓰면 끝이 아니에요 — <b>걸려 있는 모든 인덱스</b>도 정렬을 유지하게 갱신해야 해요. 슬라이더로 인덱스 개수를 바꿔 보세요. 인덱스가 3개면 한 번의 INSERT가 <b>본체 1 + 인덱스 3 = 4번의 쓰기</b>가 돼요. 읽기는 빨라지지만 쓰기는 인덱스 수만큼 무거워져요 — 그래서 "필요한 만큼만, 너무 많이 걸지 말 것".</p>
+    <div class="ctl"><label>인덱스 개수 <span id="iL" style="color:var(--hot)">3</span></label><input type="range" id="iv" min="0" max="6" step="1" value="3" style="flex:1;max-width:240px"></div>
+    <div class="scene" id="s0"></div>
+    <p class="big" id="lab0"></p>
+    <p class="note" style="margin-top:6px">→ 인덱스 = 읽기 가속의 대가로 쓰기·공간을 지불. 안 쓰는 인덱스는 순손해.</p>
+  </section>
+
+  <!-- STEP 1 -->
+  <section class="panel" data-panel="1">
+    <span class="kicker" style="color:var(--q)">Step 01 — Cardinality</span>
+    <h2>값이 다양해야 쓸모 있다</h2>
+    <p class="lead">인덱스로 좁혀지는 정도는 열의 <b>카디널리티</b>(서로 다른 값의 수)에 달렸어요. 버튼으로 비교하세요. <b>이메일</b>(거의 다 고유, 높은 카디널리티): 한 값으로 검색하면 딱 1행으로 좁혀져 인덱스가 압승. <b>성별</b>(값이 둘뿐, 낮은 카디널리티): '여성'으로 검색해도 <b>절반</b>이 맞아 — 인덱스를 타도 절반을 흩어진 채 읽어야 하니 풀스캔만 못해요. 낮은 카디널리티 열의 인덱스는 흔한 헛수고예요.</p>
+    <div class="toggles" id="card"></div>
+    <div class="scene" id="s1"></div>
+    <p class="big" id="lab1"></p>
+    <p class="note" style="margin-top:6px">→ "좁혀지냐"가 인덱스의 값어치 — 절반만 걸러내는 인덱스는 (그 검색엔) 거의 도움이 안 돼요.</p>
+  </section>
+
+  <!-- STEP 2 -->
+  <section class="panel" data-panel="2">
+    <span class="kicker" style="color:var(--v)">Step 02 — Shape of an Index</span>
+    <h2>가리키나, 곧 행이나, 다 담았나</h2>
+    <p class="lead">인덱스의 세 모양을 눌러 비교하세요. <b>Secondary(보조)</b>: 인덱스는 키 + "행이 어디 있는지" 포인터만 — 찾은 뒤 <b>본체로 한 번 더 점프</b>(추가 조회). <b>Clustered(클러스터)</b>: 인덱스의 리프가 <b>곧 행 자체</b> — 찾으면 끝, 추가 점프 없음. <b>Covering(커버링)</b>: 질문에 필요한 열이 <b>인덱스 안에 다 있어</b> 본체에 갈 필요조차 없어요. 같은 검색도 모양에 따라 <b>디스크 한 번 더 가느냐</b>가 갈려요.</p>
+    <div class="toggles" id="shape"></div>
+    <div class="scene" id="s2"></div>
+    <p class="big" id="lab2"></p>
+    <p class="note" style="margin-top:6px">→ secondary는 "본체 재방문" 비용이 숨어 있어요. covering 인덱스는 그걸 없애는 흔한 최적화.</p>
+  </section>
+
+  <!-- STEP 3 -->
+  <section class="panel" data-panel="3">
+    <span class="kicker" style="color:var(--good)">Step 03 — Takeaways</span>
+    <h2>정리 — PART B를 닫으며</h2>
+    <p class="lead">인덱스는 <b>읽기 이득 ↔ 쓰기·공간 비용</b>의 저울질이에요. 쓰기는 인덱스 수만큼 무거워지고, <b>카디널리티가 낮은</b> 열의 인덱스는 헛수고예요. 인덱스의 <b>모양</b>(secondary는 본체 재방문, clustered는 곧 행, covering은 본체 불필요)도 성능을 가르고요. 그래서 "어떤 열에, 어떤 순서로, 몇 개나" 인덱스를 둘지가 설계의 기술이에요. 이제 — 같은 질문에 인덱스를 쓸지 풀스캔할지, 누가 정하죠? 다음 PART의 주인공, 쿼리 플래너예요.</p>
+    <div class="scene" id="s3"></div>
+    <p class="big" id="lab3"></p>
+    <p class="note" style="margin-top:14px">→ 다음 → <a href="07-planner.html" style="color:var(--q);font-weight:700">CH 07 · 쿼리 플래너</a></p>
+  </section>
+
+  <p class="foot">// 코드 없는 직관 입문 · <a href="index.html">목차</a></p>
+</div>
+
+<script src="shared/lib.js"></script>
+<script src="shared/lib-db.js"></script>
+<script>
+VZ.mountTopnav('#topnav', '06 · 인덱스 비용');
+VZ.setupStepper();
+const DB=VZ.DB, clamp=VZ.clamp;
+
+// ===== STEP 0: write tax =====
+(function(){ let k=3; const iv=document.getElementById('iv'), iL=document.getElementById('iL');
+  iv.oninput=()=>{ k=+iv.value; iL.textContent=k; render(); };
+  function render(){ const W=460,H=160; let s='';
+    s+=DB.box(W/2-55,18,110,32,'INSERT 1행',{color:'var(--q)',fs:11});
+    // body write + k index writes
+    const total=1+k;
+    s+=DB.box(40,80,90,34,'본체 쓰기',{color:'var(--good)',fs:10,sub:'×1'});
+    s+=DB.edge(W/2,50,85,80,{color:'var(--good)',lw:1.4});
+    for(let i=0;i<k;i++){ const x=150+i*48; s+=DB.box(x,80,42,34,'idx'+(i+1),{color:'var(--hot)',fs:9}); s+=DB.edge(W/2,50,x+21,80,{color:'var(--hot)',lw:1.2}); }
+    s+=`<text x="${W/2}" y="138" fill="${k>=4?'var(--drop)':'var(--ink)'}" font-size="12.5" font-family="monospace" text-anchor="middle" font-weight="700">한 번의 INSERT = ${total}번의 쓰기 (본체 1 + 인덱스 ${k})</text>`;
+    document.getElementById('s0').innerHTML=DB.svg(W,H,s,'쓰기비용');
+    document.getElementById('lab0').innerHTML = k===0?'인덱스 0개: 본체에만 1번 쓰기 — 쓰기는 빠르지만 검색은 풀스캔뿐.':`인덱스 ${k}개: INSERT마다 <b style="color:${k>=4?'var(--drop)':'var(--hot)'}">${total}번</b> 써요. 읽기 이득의 대가예요.`;
+  }
+  render();
+})();
+
+// ===== STEP 1: cardinality =====
+(function(){ let mode=0;
+  const el=document.getElementById('card'); el.innerHTML=`<button data-i="0">이메일 (고유·높음)</button><button data-i="1">성별 (둘뿐·낮음)</button>`;
+  function render(){ const W=460,H=160; const N=12; let s='';
+    // 12 rows; email search matches 1, gender search matches 6
+    const matched = mode===0?1:6;
+    const cw=32,gap=4,x0=24,y=44;
+    for(let i=0;i<N;i++){ const hit = mode===0? i===3 : i%2===0;
+      s+=DB.cell(x0+i*(cw+gap),y,cw,30, mode===0?(i===3?'★':'·'):(i%2===0?'여':'남'),{fill:hit?'var(--good)':'var(--panel)',tcol:hit?'#0b0e14':'var(--muted)',fs:10,bold:hit}); }
+    s+=`<text x="${W/2}" y="100" fill="${mode===0?'var(--good)':'var(--drop)'}" font-size="11.5" font-family="monospace" text-anchor="middle" font-weight="700">${mode===0?'한 값 검색 → 1/12행으로 좁혀짐 (인덱스 압승)':"'여성' 검색 → 6/12행이 맞음 (절반, 인덱스 무용)"}</text>`;
+    s+=`<text x="${W/2}" y="124" fill="var(--muted)" font-size="10" font-family="monospace" text-anchor="middle">카디널리티 = 서로 다른 값의 수 (${mode===0?'높음: 거의 다 고유':'낮음: 값이 둘뿐'})</text>`;
+    document.getElementById('s1').innerHTML=DB.svg(W,H,s,mode===0?'고카디널리티':'저카디널리티');
+    document.querySelectorAll('#card button').forEach((b,i)=>{ const on=i===mode; b.classList.toggle('on',on); b.style.background=on?(i===0?'var(--good)':'var(--drop)'):'var(--panel-2)'; b.style.color=on?'#0b0e14':'var(--muted)'; });
+    document.getElementById('lab1').innerHTML = mode===0?'<b style="color:var(--good)">높은 카디널리티</b>: 1행으로 좁혀져 인덱스가 빛나요.':'<b style="color:var(--drop)">낮은 카디널리티</b>: 절반이 맞아 인덱스 타도 헛수고.';
+  }
+  el.addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b)return; mode=+b.dataset.i; render(); });
+  render();
+})();
+
+// ===== STEP 2: index shape =====
+(function(){ let mode=0;
+  const el=document.getElementById('shape'); el.innerHTML=`<button data-i="0">Secondary</button><button data-i="1">Clustered</button><button data-i="2">Covering</button>`;
+  function render(){ const W=460,H=180; let s='';
+    s+=DB.box(40,30,150,34,'인덱스 (정렬된 키)',{color:'var(--v)',fs:10});
+    if(mode===0){ // secondary: key+pointer -> heap
+      s+=DB.box(40,110,150,40,'본체 테이블 (행)',{color:'var(--q)',fs:10,sub:'추가 조회'});
+      s+=DB.edge(115,64,115,110,{color:'var(--hot)',lw:1.8});
+      s+=`<text x="210" y="90" fill="var(--hot)" font-size="10.5" font-family="monospace">① 인덱스서 키 찾음</text>`;
+      s+=`<text x="210" y="110" fill="var(--hot)" font-size="10.5" font-family="monospace">② 포인터 따라 본체로 점프(디스크 1번 더)</text>`;
+    } else if(mode===1){ // clustered: index leaf IS row
+      s+=DB.box(40,30,150,52,'인덱스 = 행 자체',{color:'var(--good)',fs:10,sub:'리프에 행이 통째로'});
+      s+=`<text x="220" y="56" fill="var(--good)" font-size="10.5" font-family="monospace">찾으면 끝 — 추가 점프 없음</text>`;
+      s+=`<text x="220" y="78" fill="var(--muted)" font-size="9.5" font-family="monospace">정렬 키 순서로 행이 물리 배치됨</text>`;
+    } else { // covering
+      s+=DB.box(40,30,200,52,'인덱스 (키 + 필요한 열 다 포함)',{color:'var(--good)',fs:10,sub:'질문이 원하는 값이 인덱스 안에'});
+      s+=`<rect x="40" y="110" width="150" height="40" rx="8" fill="var(--panel)" stroke="var(--line)" stroke-dasharray="4 3"/><text x="115" y="134" text-anchor="middle" font-size="10" font-family="monospace" fill="var(--faint)">본체 (안 감)</text>`;
+      s+=`<text x="260" y="56" fill="var(--good)" font-size="10.5" font-family="monospace">인덱스만 읽고 끝</text>`;
+      s+=`<text x="260" y="78" fill="var(--muted)" font-size="9.5" font-family="monospace">본체 재방문 불필요</text>`;
+    }
+    document.getElementById('s2').innerHTML=DB.svg(W,H,s,['secondary','clustered','covering'][mode]);
+    document.querySelectorAll('#shape button').forEach((b,i)=>{ const on=i===mode; b.classList.toggle('on',on); b.style.background=on?(i===0?'var(--hot)':'var(--good)'):'var(--panel-2)'; b.style.color=on?'#0b0e14':'var(--muted)'; });
+    const L=['<b style="color:var(--hot)">Secondary</b>: 키 찾고 포인터로 본체 재방문(디스크 한 번 더).','<b style="color:var(--good)">Clustered</b>: 인덱스 리프가 곧 행 — 추가 점프 없음.','<b style="color:var(--good)">Covering</b>: 필요한 값이 인덱스에 다 있어 본체에 안 감.'];
+    document.getElementById('lab2').innerHTML=L[mode];
+  }
+  el.addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b)return; mode=+b.dataset.i; render(); });
+  render();
+})();
+
+// ===== STEP 3 =====
+(function(){ const W=460,H=130;
+  let s=`<text x="${W/2}" y="26" fill="var(--hot)" font-size="12.5" font-family="monospace" text-anchor="middle" font-weight="700">인덱스 = 읽기 이득 ↔ 쓰기·공간 비용</text>`;
+  const rows=[['쓰기 대가','인덱스 수만큼 INSERT가 무거워짐','var(--hot)'],['카디널리티','값이 다양해야 좁혀짐(성별=헛수고)','var(--drop)'],['모양','secondary 재방문 / clustered / covering','var(--v)']];
+  rows.forEach((r,i)=>{ const y=40+i*28; s+=`<rect x="20" y="${y}" width="${W-40}" height="23" rx="6" fill="var(--panel)" stroke="${r[2]}" stroke-width="1.1"/><text x="34" y="${y+15.5}" fill="${r[2]}" font-size="11" font-family="monospace" font-weight="700">${r[0]}</text><text x="${W-34}" y="${y+15.5}" fill="var(--ink)" font-size="9" font-family="monospace" text-anchor="end">${r[1]}</text>`; });
+  document.getElementById('s3').innerHTML=DB.svg(W,H,s,'정리');
+  document.getElementById('lab3').innerHTML='인덱스를 쓸지 풀스캔할지 — 누가 정할까? <b style="color:var(--q)">쿼리 플래너</b>.';
+})();
+</script>
+</body>
+</html>

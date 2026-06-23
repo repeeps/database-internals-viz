@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>02 · 비용의 언어 · 풀 스캔 — 데이터베이스, 눈으로 보기</title>
+<link rel="stylesheet" href="shared/theme.css">
+<link rel="icon" type="image/svg+xml" href="shared/favicon.svg">
+<style>
+  .big{font-family:'JetBrains Mono',monospace; font-size:14px; color:var(--ink); margin:8px 2px 0;}
+  .ctl{display:flex; align-items:center; gap:10px; margin:10px 0; flex-wrap:wrap;}
+  svg{display:block; width:100%;}
+  .toggles{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
+  .toggles button{font-family:'JetBrains Mono',monospace;font-size:12px;padding:7px 12px;border-radius:8px;background:var(--panel-2);border:1px solid var(--line);color:var(--muted);cursor:pointer}
+  .toggles button.on{color:#0b0e14;font-weight:700}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topnav" id="topnav"></div>
+
+  <header>
+    <div class="tag" style="color:var(--q)">PART A · 저장과 읽기 — CH 02</div>
+    <h1>비용의 언어 · 풀 스캔</h1>
+    <p class="intro">길잡이(인덱스)가 없으면, 원하는 행을 찾는 유일한 방법은 <b>처음부터 끝까지 다 읽는</b> 거예요 — 이걸 <b>풀 테이블 스캔</b>이라고 해요. 한 페이지씩 순서대로 전부 디스크에서 가져와 훑죠. 비용은 단순명료해요: <b>읽는 페이지 수에 비례</b> — 테이블이 2배 크면 2배 오래 걸려요. 이 트랙에서 "빠르다/느리다"를 말할 땐 늘 이 <b>비용(읽은 페이지 수)</b>으로 따질 거예요. 풀 스캔은 가장 단순하고 보통 가장 비싼 읽기라, <b>모든 비용의 기준점(baseline)</b>이 돼요. 앞으로 인덱스가 이 기준선을 얼마나 낮추는지를 계속 견줄 거예요. 단, 풀 스캔이 늘 지는 건 아니에요 — 테이블의 <b>대부분 행을 어차피 읽어야 한다면</b>, 순차로 죽 읽는 풀 스캔이 흩어진 인덱스 조회보다 외려 쌀 수도 있어요.</p>
+  </header>
+
+  <nav class="stepper" id="stepper">
+    <button data-s="0" class="active">00 · 처음부터 끝까지</button>
+    <button data-s="1">01 · 비용의 기준점</button>
+    <button data-s="2">02 · 풀스캔이 이길 때</button>
+    <button data-s="3">03 · 정리</button>
+  </nav>
+
+  <!-- STEP 0 -->
+  <section class="panel show" data-panel="0">
+    <span class="kicker" style="color:var(--hot)">Step 00 — Read Every Page</span>
+    <h2>한 페이지도 빠짐없이</h2>
+    <p class="lead">인덱스 없이 "잔액이 정확히 880인 행"을 찾아요. 엔진은 어디 있는지 모르니 <b>모든 페이지를 순서대로</b> 읽어 한 행씩 확인해요. 재생하면 페이지를 하나씩 읽어 내려가는 게 보여요 — 찾았더라도(혹은 못 찾아도) 조건에 따라 끝까지 갈 수도 있어요. <b>비용 = 읽은 페이지 수</b>.</p>
+    <div class="ctl"><button class="btn play" id="go0">▶ 풀 스캔</button></div>
+    <div class="scene" id="s0"></div>
+    <p class="big" id="lab0"></p>
+    <p class="note" style="margin-top:6px">→ "어디 있는지 모른다"가 풀스캔의 본질 — 다 읽어봐야 알아요. 인덱스는 이걸 없애요.</p>
+  </section>
+
+  <!-- STEP 1 -->
+  <section class="panel" data-panel="1">
+    <span class="kicker" style="color:var(--q)">Step 01 — The Baseline Cost</span>
+    <h2>행이 2배면 비용도 2배</h2>
+    <p class="lead">테이블 크기를 바꿔 보세요. 풀 스캔 비용은 <b>페이지 수에 정비례</b>해 곧게 올라가요(선형). 이게 우리의 <b>기준선</b>이에요 — 앞으로 인덱스가 이 막대를 얼마나 짧게 줄이는지를 계속 견줄 거예요. 인덱스 탐색은 보통 이 선형 막대를 <b>로그(log) 높이</b>로 — 즉 거의 평평하게 — 눌러요(PART B).</p>
+    <div class="ctl"><label>테이블 페이지 수 <span id="pL" style="color:var(--hot)">40</span></label><input type="range" id="pv" min="10" max="200" step="10" value="40" style="flex:1"></div>
+    <div class="scene" id="s1"></div>
+    <p class="big" id="lab1"></p>
+    <p class="note" style="margin-top:6px">→ 풀 스캔 = 선형(O(n)). 인덱스 = 로그(O(log n)). 이 격차가 PART B의 전부예요.</p>
+  </section>
+
+  <!-- STEP 2 -->
+  <section class="panel" data-panel="2">
+    <span class="kicker" style="color:var(--v)">Step 02 — When Full Scan Wins</span>
+    <h2>풀 스캔이 외려 이길 때</h2>
+    <p class="lead">이번 질문은 <b>범위 조건</b>이에요 — "잔액이 어떤 값 <b>이상</b>인 행"(맞는 행 수가 0~100%로 변함). 슬라이더로 그 비율을 바꿔 보세요. <b>적게 맞으면</b>(예: 5%) 인덱스로 그 몇 개만 콕 집는 게 압승. 하지만 <b>많이 맞으면</b>(예: 50%↑) — 어차피 거의 다 읽어야 하는데, 인덱스는 맞는 행마다 <b>흩어진(랜덤) 조회</b>를 하니 외려 비싸지고, <b>순차로 죽 읽는 풀 스캔</b>이 이겨요. 보통 <b>20% 안팎</b>에서 역전돼요. "인덱스=무조건 빠름"이 아니에요.</p>
+    <div class="ctl"><label>맞는 행 비율 <span id="sL" style="color:var(--hot)">5%</span></label><input type="range" id="sv" min="1" max="100" step="1" value="5" style="flex:1"></div>
+    <div class="scene" id="s2"></div>
+    <p class="big" id="lab2"></p>
+    <p class="note" style="margin-top:6px">→ 이 "선택도(selectivity)"가 PART C에서 플래너가 풀스캔/인덱스를 고르는 핵심 잣대예요.</p>
+  </section>
+
+  <!-- STEP 3 -->
+  <section class="panel" data-panel="3">
+    <span class="kicker" style="color:var(--good)">Step 03 — Takeaways</span>
+    <h2>정리</h2>
+    <p class="lead"><b>풀 스캔</b> = 인덱스 없이 모든 페이지를 순서대로 읽기. 비용은 <b>페이지 수에 정비례</b>(선형)하고, 이게 모든 비용의 <b>기준선</b>이에요. 대부분 행을 읽어야 할 땐 순차 풀 스캔이 외려 이기지만, 소수의 행만 필요할 땐 처참하게 느려요 — 바로 그 자리를 인덱스가 메워요. 다음 PART에서 "정렬"이라는 단 하나의 아이디어로 이 선형 기준선을 로그로 끌어내려요.</p>
+    <div class="scene" id="s3"></div>
+    <p class="big" id="lab3"></p>
+    <p class="note" style="margin-top:14px">→ 다음 → <a href="03-sorted.html" style="color:var(--q);font-weight:700">CH 03 · 정렬의 힘</a></p>
+  </section>
+
+  <p class="foot">// 코드 없는 직관 입문 · <a href="index.html">목차</a></p>
+</div>
+
+<script src="shared/lib.js"></script>
+<script src="shared/lib-db.js"></script>
+<script>
+VZ.mountTopnav('#topnav', '02 · 풀 스캔');
+VZ.setupStepper();
+const DB=VZ.DB, clamp=VZ.clamp;
+
+// ===== STEP 0: scan every page =====
+(function(){ let cancel=null; const W=460,H=150; const N=10; const targetPage=6;
+  function frame(p){ const upto=Math.round(p*(N-1)); let s='';
+    const pw=38,gap=5,x0=22,y=46;
+    for(let i=0;i<N;i++){ const done=i<upto, cur=i===upto; const found=i===targetPage&&i<=upto;
+      const f = found?'var(--good)':cur?'var(--hot)':done?'var(--slate)':'var(--panel)';
+      s+=`<rect x="${x0+i*(pw+gap)}" y="${y}" width="${pw}" height="42" rx="5" fill="${f}" opacity="${(done||cur||found)?0.92:1}" stroke="var(--line)"/>`;
+      s+=`<text x="${x0+i*(pw+gap)+pw/2}" y="${y+26}" text-anchor="middle" font-size="10" font-family="monospace" fill="${(done||cur||found)?'#0b0e14':'var(--muted)'}">P${i}</text>`;
+    }
+    s+=`<text x="${W/2}" y="32" fill="var(--muted)" font-size="10" font-family="monospace" text-anchor="middle">잔액=880 인 행 찾기 (어디 있는지 모름)</text>`;
+    s+=`<text x="${W/2}" y="118" fill="${upto>=targetPage?'var(--good)':'var(--hot)'}" font-size="11.5" font-family="monospace" text-anchor="middle" font-weight="700">읽은 페이지 ${Math.min(upto+1,N)} / ${N}</text>`;
+    document.getElementById('s0').innerHTML=DB.svg(W,H,s,'풀스캔');
+    document.getElementById('lab0').innerHTML = p<1?'한 페이지씩 읽는 중…':`<b style="color:var(--good)">P${targetPage}</b>에서 찾았지만, 그 전 ${targetPage}장을 다 읽어야 했어요 — 비용 = 페이지 수.`;
+  }
+  document.getElementById('go0').onclick=()=>{ if(cancel)cancel(); cancel=VZ.LA.tween(p=>frame(p),2600,()=>frame(1)); };
+  frame(1);
+})();
+
+// ===== STEP 1: baseline cost (linear vs log) =====
+(function(){ let pages=40; const pv=document.getElementById('pv'), pL=document.getElementById('pL');
+  pv.oninput=()=>{ pages=+pv.value; pL.textContent=pages; render(); };
+  function render(){ const W=460,H=150;
+    const scanCost=pages; const idxCost=Math.max(1, Math.ceil(Math.log2(pages))+2); // log-ish
+    const items=[{label:'풀 스캔(기준선)',cost:scanCost},{label:'인덱스(예고)',cost:idxCost,picked:true,best:true}];
+    let s=DB.costBar(20,24,420,items,{bh:30,gap:18});
+    s+=`<text x="${W/2}" y="120" fill="var(--muted)" font-size="10" font-family="monospace" text-anchor="middle">페이지 ${pages}장 → 풀스캔 비용 ${scanCost}, 인덱스 ≈ ${idxCost}</text>`;
+    document.getElementById('s1').innerHTML=DB.svg(W,H,s,'비용 기준선');
+    document.getElementById('lab1').innerHTML = `풀 스캔 <b style="color:var(--hot)">${scanCost}</b> vs 인덱스 <b style="color:var(--good)">≈${idxCost}</b> — 테이블이 커질수록 격차가 폭발해요(선형 vs 로그).`;
+  }
+  render();
+})();
+
+// ===== STEP 2: when full scan wins (selectivity) =====
+(function(){ let sel=5; const sv=document.getElementById('sv'), sL=document.getElementById('sL');
+  sv.oninput=()=>{ sel=+sv.value; sL.textContent=sel+'%'; render(); };
+  function render(){ const W=460,H=150; const total=100;
+    const matched=total*sel/100;
+    const scanCost=total; // always read all pages (sequential, cheap per page)
+    const idxCost=Math.round(matched*5 + 3); // index: scattered random lookup per matched row (~5x penalty) → 역전 ~20%
+    const scanWins=scanCost<idxCost;
+    const items=[{label:'풀 스캔(순차)',cost:scanCost,picked:scanWins,best:scanWins},{label:'인덱스(랜덤조회)',cost:idxCost,picked:!scanWins,best:!scanWins}];
+    let s=DB.costBar(20,24,420,items,{bh:30,gap:18});
+    s+=`<text x="${W/2}" y="120" fill="var(--muted)" font-size="10" font-family="monospace" text-anchor="middle">맞는 행 ${sel}% (${matched.toFixed(0)}개) · 인덱스는 행마다 흩어진 조회</text>`;
+    document.getElementById('s2').innerHTML=DB.svg(W,H,s,'선택도');
+    document.getElementById('lab2').innerHTML = scanWins?`맞는 행이 많아(${sel}%) <b style="color:var(--good)">풀 스캔이 이겨요</b> — 어차피 다 읽을 거, 순차가 싸요.`:`맞는 행이 적어(${sel}%) <b style="color:var(--good)">인덱스가 이겨요</b> — 그 몇 개만 콕 집으면 되니까.`;
+  }
+  render();
+})();
+
+// ===== STEP 3 =====
+(function(){ const W=460,H=110;
+  let s=`<text x="${W/2}" y="26" fill="var(--q)" font-size="12.5" font-family="monospace" text-anchor="middle" font-weight="700">풀 스캔 = 선형 기준선 (페이지 수에 비례)</text>`;
+  const rows=[['소수 행 찾기','풀스캔 처참 → 인덱스가 메움 (PART B)','var(--hot)'],['대부분 행 읽기','순차 풀스캔이 외려 이김 (선택도)','var(--good)']];
+  rows.forEach((r,i)=>{ const y=42+i*30; s+=`<rect x="20" y="${y}" width="${W-40}" height="25" rx="6" fill="var(--panel)" stroke="${r[2]}" stroke-width="1.1"/><text x="34" y="${y+16.5}" fill="${r[2]}" font-size="11" font-family="monospace" font-weight="700">${r[0]}</text><text x="${W-34}" y="${y+16.5}" fill="var(--ink)" font-size="9.5" font-family="monospace" text-anchor="end">${r[1]}</text>`; });
+  document.getElementById('s3').innerHTML=DB.svg(W,H,s,'정리');
+  document.getElementById('lab3').innerHTML='이제 "정렬"이라는 한 아이디어로 선형 기준선을 <b style="color:var(--q)">로그</b>로 끌어내려요.';
+})();
+</script>
+</body>
+</html>

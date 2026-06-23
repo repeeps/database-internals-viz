@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>12 · 락 · 격리수준 — 데이터베이스, 눈으로 보기</title>
+<link rel="stylesheet" href="shared/theme.css">
+<link rel="icon" type="image/svg+xml" href="shared/favicon.svg">
+<style>
+  .big{font-family:'JetBrains Mono',monospace; font-size:14px; color:var(--ink); margin:8px 2px 0;}
+  .ctl{display:flex; align-items:center; gap:10px; margin:10px 0; flex-wrap:wrap;}
+  svg{display:block; width:100%;}
+  .toggles{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
+  .toggles button{font-family:'JetBrains Mono',monospace;font-size:12px;padding:7px 12px;border-radius:8px;background:var(--panel-2);border:1px solid var(--line);color:var(--muted);cursor:pointer}
+  .toggles button.on{color:#0b0e14;font-weight:700}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topnav" id="topnav"></div>
+
+  <header>
+    <div class="tag" style="color:var(--hot)">PART D · 트랜잭션과 동시성 — CH 12</div>
+    <h1>락 · 격리수준</h1>
+    <p class="intro">앞 챕터의 사고(더티·반복불가·팬텀)를 막는 가장 직접적인 도구는 <b>락(lock)</b>이에요 — 누군가 데이터를 만지는 동안 <b>문을 잠가</b> 다른 사람을 기다리게 하는 거죠(동시성 트랙의 그 잠금이 DB로 온 거예요). 락에는 두 종류가 있어요: <b>공유 락(S)</b> — 읽기끼리는 같이 가져도 OK(여럿이 동시에 읽기), <b>배타 락(X)</b> — 쓰기는 혼자만(아무도 못 들어옴). 그런데 모든 걸 꽉 잠그면 안전하지만 <b>동시성이 죽어요</b>(다 줄 서야 하니까). 그래서 데이터베이스는 <b>격리수준</b>이라는 다이얼을 줘요 — "어떤 사고까지 막고, 어디까지는 눈감을지"를 고르는 거예요. <b>Read Uncommitted → Read Committed → Repeatable Read → Serializable</b> 순으로 점점 더 엄격해지며 더 많은 사고를 막지만, 그만큼 동시성은 줄어요. 이게 이 챕터의 핵심 지도 — <b>4단계 × 3사고</b>의 격자예요. 마지막엔 락이 부르는 또 다른 함정, 데드락도 다시 만나요.</p>
+  </header>
+
+  <nav class="stepper" id="stepper">
+    <button data-s="0" class="active">00 · 공유 락 vs 배타 락</button>
+    <button data-s="1">01 · 격리수준 4×3 지도</button>
+    <button data-s="2">02 · 데드락</button>
+    <button data-s="3">03 · 정리</button>
+  </nav>
+
+  <!-- STEP 0 -->
+  <section class="panel show" data-panel="0">
+    <span class="kicker" style="color:var(--hot)">Step 00 — Shared vs Exclusive</span>
+    <h2>읽기는 같이, 쓰기는 혼자</h2>
+    <p class="lead">락 두 종류의 <b>호환표</b>를 보세요. 누가 <b>공유 락(S, 읽기)</b>을 쥔 데에 다른 읽기(S)가 또 오면? <b>OK</b> — 읽기끼리는 서로 안 방해해요. 하지만 한쪽이 <b>배타 락(X, 쓰기)</b>이면 어떤 것도(S든 X든) <b>기다려야</b> 해요 — 쓰는 중엔 아무도 못 봐요. 즉 <b>읽기-읽기만 동시 가능</b>, 쓰기가 끼면 직렬. 칸을 눌러 조합을 확인하세요.</p>
+    <div class="toggles" id="lk"></div>
+    <div class="scene" id="s0"></div>
+    <p class="big" id="lab0"></p>
+    <p class="note" style="margin-top:6px">→ S+S만 ✓, 나머지는 ✗(대기). 쓰기는 본질적으로 줄 세우기 — 안전의 대가.</p>
+  </section>
+
+  <!-- STEP 1 -->
+  <section class="panel" data-panel="1">
+    <span class="kicker" style="color:var(--q)">Step 01 — The 4×3 Map</span>
+    <h2>격리수준 × 이상현상</h2>
+    <p class="lead">이 챕터의 핵심 지도예요. 4개의 격리수준을 눌러, 각 수준이 세 사고를 <b>막는지(✓) 허용하는지(✗)</b> 보세요. 위로 갈수록 느슨(동시성↑·위험↑), 아래로 갈수록 엄격(안전↑·동시성↓). <b>Read Committed</b>는 더티만 막고, <b>Repeatable Read</b>는 반복불가까지, <b>Serializable</b>은 셋 다 막아요(마치 트랜잭션이 한 줄로 차례차례 실행된 것처럼). 정답은 없어요 — 앱이 견딜 수 있는 사고와 필요한 동시성으로 골라요.</p>
+    <div class="toggles" id="iso"></div>
+    <div class="scene" id="s1"></div>
+    <p class="big" id="lab1"></p>
+    <p class="note" style="margin-top:6px">→ Serializable = 셋 다 차단(가장 안전·가장 느림). 한 단계 내릴 때마다 사고 하나를 동시성과 맞바꿔요.</p>
+  </section>
+
+  <!-- STEP 2 -->
+  <section class="panel" data-panel="2">
+    <span class="kicker" style="color:var(--v)">Step 02 — Deadlock</span>
+    <h2>서로의 락을 기다리다 멈춘다</h2>
+    <p class="lead">락이 부르는 함정 — 동시성 트랙에서 본 <b>데드락</b>이 DB에도 그대로 와요. T1이 행 X를 잠그고 행 Y를 원하는데, 동시에 T2가 Y를 잠그고 X를 원하면? 서로 상대가 놓기를 <b>영영 기다려요</b>(순환 대기). 차이는 — DB 엔진은 이걸 <b>자동 감지</b>해서 한쪽을 <b>희생양(victim)으로 골라 롤백</b>시켜 풀어요. 롤백된 트랜잭션은 다시 시도하면 되죠. 토글로 교착과 해소를 보세요.</p>
+    <div class="toggles" id="dl"></div>
+    <div class="scene" id="s2"></div>
+    <p class="big" id="lab2"></p>
+    <p class="note" style="margin-top:6px">→ DB 데드락도 순환 대기 — 단 엔진이 감지해 victim을 abort. (예방책: 락 순서 통일 등)</p>
+  </section>
+
+  <!-- STEP 3 -->
+  <section class="panel" data-panel="3">
+    <span class="kicker" style="color:var(--good)">Step 03 — Takeaways</span>
+    <h2>정리</h2>
+    <p class="lead"><b>락</b>(공유 S=읽기 같이 / 배타 X=쓰기 혼자)으로 사고를 막지만, 꽉 잠글수록 동시성이 죽어요. <b>격리수준</b>은 "어디까지 막을지"의 다이얼 — RU→RC→RR→Serializable로 갈수록 더 많은 사고(더티→반복불가→팬텀)를 막지만 동시성은 줄어요. 락을 여러 개 쓰면 <b>데드락</b>이 생기는데, 엔진이 감지해 victim을 롤백해 풀어요. 그런데 "읽기도 쓰기 락에 막혀 기다린다"는 게 영 아쉽죠 — 읽기는 안 막고도 일관되게 볼 수 없을까? 그게 현대 DB의 답, MVCC예요.</p>
+    <div class="scene" id="s3"></div>
+    <p class="big" id="lab3"></p>
+    <p class="note" style="margin-top:14px">→ 다음 → <a href="13-mvcc.html" style="color:var(--q);font-weight:700">CH 13 · MVCC</a></p>
+  </section>
+
+  <p class="foot">// 코드 없는 직관 입문 · <a href="index.html">목차</a></p>
+</div>
+
+<script src="shared/lib.js"></script>
+<script src="shared/lib-db.js"></script>
+<script>
+VZ.mountTopnav('#topnav', '12 · 락·격리수준');
+VZ.setupStepper();
+const DB=VZ.DB;
+
+// ===== STEP 0: lock matrix =====
+(function(){ let hl=null; // [held, req]
+  const combos=[['S','S'],['S','X'],['X','S'],['X','X']];
+  const el=document.getElementById('lk'); el.innerHTML=combos.map((c,i)=>`<button data-i="${i}">보유 ${c[0]} · 요청 ${c[1]}</button>`).join('');
+  function render(){ const W=460,H=170; let s=DB.lockMatrix(150,46,{hl:hl});
+    document.getElementById('s0').innerHTML=DB.svg(W,H,s,'락 호환');
+    document.querySelectorAll('#lk button').forEach((b,i)=>{ const on=hl&&hl[0]===combos[i][0]&&hl[1]===combos[i][1]; b.classList.toggle('on',!!on); const ok=combos[i][0]==='S'&&combos[i][1]==='S'; b.style.background=on?(ok?'var(--good)':'var(--drop)'):'var(--panel-2)'; b.style.color=on?'#0b0e14':'var(--muted)'; });
+    if(!hl) document.getElementById('lab0').innerHTML='조합을 눌러 보세요 — 보유한 락과 새로 요청한 락이 호환되는지.';
+    else { const ok=hl[0]==='S'&&hl[1]==='S'; document.getElementById('lab0').innerHTML = ok?`<b style="color:var(--good)">${hl[0]}+${hl[1]} = OK</b> — 읽기끼리는 동시에 가능.`:`<b style="color:var(--drop)">${hl[0]}+${hl[1]} = 대기</b> — 쓰기(X)가 끼면 줄 서야 해요.`; }
+  }
+  el.addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b)return; hl=combos[+b.dataset.i]; render(); });
+  render();
+})();
+
+// ===== STEP 1: 4x3 isolation grid =====
+(function(){ let lvl=1;
+  const LV=[
+    {k:'Read Uncommitted',a:[false,false,false]},
+    {k:'Read Committed',a:[true,false,false]},
+    {k:'Repeatable Read',a:[true,true,false]},
+    {k:'Serializable',a:[true,true,true]},
+  ]; // a[i] = blocks anomaly i  (dirty, non-rep, phantom)
+  const ANO=['더티 리드','반복 불가','팬텀'];
+  const el=document.getElementById('iso'); el.innerHTML=LV.map((l,i)=>`<button data-i="${i}">${l.k}</button>`).join('');
+  function render(){ const W=460,H=210; const cw=110, x0=120, y0=44, rh=36; let s='';
+    // header (anomalies)
+    ANO.forEach((a,c)=>s+=`<text x="${x0+c*cw+cw/2}" y="${y0-8}" text-anchor="middle" font-size="10" font-family="monospace" fill="var(--muted)">${a}</text>`);
+    LV.forEach((l,r)=>{ const ry=y0+r*rh; const seld=r===lvl;
+      s+=`<text x="${x0-8}" y="${ry+rh/2+4}" text-anchor="end" font-size="10" font-family="monospace" fill="${seld?'var(--hot)':'var(--muted)'}" font-weight="${seld?700:400}">${l.k}</text>`;
+      l.a.forEach((blocks,c)=>{ const cx=x0+c*cw; const f=blocks?'var(--good)':'var(--drop)';
+        s+=`<rect x="${cx+4}" y="${ry+3}" width="${cw-8}" height="${rh-6}" rx="5" fill="${f}" opacity="${seld?0.95:0.3}" stroke="${seld?'var(--ink)':'var(--line)'}" stroke-width="${seld?1.8:0.8}"/>`;
+        s+=`<text x="${cx+cw/2}" y="${ry+rh/2+4}" text-anchor="middle" font-size="11" font-family="monospace" fill="#0b0e14" font-weight="700" opacity="${seld?1:0.5}">${blocks?'차단✓':'허용✗'}</text>`; });
+    });
+    s+=`<text x="${W/2}" y="${y0+4*rh+18}" text-anchor="middle" font-size="9.5" font-family="monospace" fill="var(--muted)">위=느슨(동시성↑·위험↑) · 아래=엄격(안전↑·동시성↓)</text>`;
+    document.getElementById('s1').innerHTML=DB.svg(W,H,s,'격리수준 지도');
+    document.querySelectorAll('#iso button').forEach((b,i)=>{ const on=i===lvl; b.classList.toggle('on',on); b.style.background=on?'var(--hot)':'var(--panel-2)'; b.style.color=on?'#0b0e14':'var(--muted)'; });
+    const l=LV[lvl]; const blocked=l.a.map((b,i)=>b?ANO[i]:null).filter(Boolean);
+    document.getElementById('lab1').innerHTML = `<b style="color:var(--hot)">${l.k}</b>: ${blocked.length?'차단 — '+blocked.join('·'):'아무것도 안 막음(가장 느슨)'}${lvl===3?' (셋 다 — 마치 한 줄로 차례차례)':''}`;
+  }
+  el.addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b)return; lvl=+b.dataset.i; render(); });
+  render();
+})();
+
+// ===== STEP 2: deadlock =====
+(function(){ let mode=0;
+  const el=document.getElementById('dl'); el.innerHTML=`<button data-i="0">교착 발생</button><button data-i="1">엔진이 해소</button>`;
+  function render(){ const W=460,H=180; const resolved=mode===1; let s='';
+    // T1, T2 boxes; X, Y lock boxes; cycle
+    s+=DB.box(40,30,110,38,'T1',{color:'var(--q)',fs:12,sub:'X 쥠, Y 원함'});
+    s+=DB.box(310,30,110,38,'T2',{color:'var(--pink)',fs:12,sub:'Y 쥠, X 원함'});
+    s+=DB.box(40,120,110,36,'락 X',{color:'var(--hot)',fs:11});
+    s+=DB.box(310,120,110,36,'락 Y',{color:'var(--hot)',fs:11});
+    // T1 holds X (solid), wants Y (dashed)
+    s+=DB.edge(95,120,95,68,{color:'var(--q)',lw:2}); // hold X
+    s+=DB.edge(310,49,150,138,{color:resolved?'var(--line)':'var(--drop)',lw:resolved?1.2:2.2,dash:resolved?'4 3':null}); // T2 wants X
+    s+=DB.edge(365,120,365,68,{color:'var(--pink)',lw:2}); // hold Y
+    s+=DB.edge(150,49,310,138,{color:'var(--drop)',lw:2.2}); // T1 wants Y
+    if(resolved){ s+=`<text x="375" y="52" font-size="16" fill="var(--drop)">✗</text>`; s+=`<text x="${W/2}" y="172" text-anchor="middle" font-size="11" font-family="monospace" fill="var(--good)" font-weight="700">엔진이 한쪽(예: T2)을 victim으로 롤백 → T1 진행, T2 재시도</text>`; }
+    else s+=`<text x="${W/2}" y="172" text-anchor="middle" font-size="11" font-family="monospace" fill="var(--drop)" font-weight="700">⊗ 순환 대기 — 둘 다 영영 멈춤</text>`;
+    document.getElementById('s2').innerHTML=DB.svg(W,H,s,resolved?'해소':'교착');
+    document.querySelectorAll('#dl button').forEach((b,i)=>{ const on=i===mode; b.classList.toggle('on',on); b.style.background=on?(i===0?'var(--drop)':'var(--good)'):'var(--panel-2)'; b.style.color=on?'#0b0e14':'var(--muted)'; });
+    document.getElementById('lab2').innerHTML = resolved?'<b style="color:var(--good)">해소</b>: 엔진이 순환을 감지해 한쪽(victim)을 롤백 — 나머지는 진행.':'<b style="color:var(--drop)">교착</b>: T1↔T2가 서로의 락을 기다려 멈춤(순환 대기).';
+  }
+  el.addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b)return; mode=+b.dataset.i; render(); });
+  render();
+})();
+
+// ===== STEP 3 =====
+(function(){ const W=460,H=130;
+  let s=`<text x="${W/2}" y="26" fill="var(--hot)" font-size="12" font-family="monospace" text-anchor="middle" font-weight="700">격리수준 = "어디까지 막을지" 다이얼</text>`;
+  const rows=[['락','S(읽기 같이)/X(쓰기 혼자) — 안전↔동시성','var(--q)'],['4단계','RU→RC→RR→Serializable(엄격↑)','var(--hot)'],['데드락','순환 대기 → 엔진이 victim 롤백','var(--drop)']];
+  rows.forEach((r,i)=>{ const y=40+i*28; s+=`<rect x="20" y="${y}" width="${W-40}" height="23" rx="6" fill="var(--panel)" stroke="${r[2]}" stroke-width="1.1"/><text x="34" y="${y+15.5}" fill="${r[2]}" font-size="11" font-family="monospace" font-weight="700">${r[0]}</text><text x="${W-34}" y="${y+15.5}" fill="var(--ink)" font-size="9" font-family="monospace" text-anchor="end">${r[1]}</text>`; });
+  document.getElementById('s3').innerHTML=DB.svg(W,H,s,'정리');
+  document.getElementById('lab3').innerHTML='읽기를 안 막고도 일관되게 보려면? 현대 DB의 답 — <b style="color:var(--q)">MVCC</b>.';
+})();
+</script>
+</body>
+</html>

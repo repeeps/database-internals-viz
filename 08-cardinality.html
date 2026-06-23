@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>08 · 통계와 카디널리티 — 데이터베이스, 눈으로 보기</title>
+<link rel="stylesheet" href="shared/theme.css">
+<link rel="icon" type="image/svg+xml" href="shared/favicon.svg">
+<style>
+  .big{font-family:'JetBrains Mono',monospace; font-size:14px; color:var(--ink); margin:8px 2px 0;}
+  .ctl{display:flex; align-items:center; gap:10px; margin:10px 0; flex-wrap:wrap;}
+  svg{display:block; width:100%;}
+  .toggles{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
+  .toggles button{font-family:'JetBrains Mono',monospace;font-size:12px;padding:7px 12px;border-radius:8px;background:var(--panel-2);border:1px solid var(--line);color:var(--muted);cursor:pointer}
+  .toggles button.on{color:#0b0e14;font-weight:700}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topnav" id="topnav"></div>
+
+  <header>
+    <div class="tag" style="color:var(--v)">PART C · 쿼리 실행 — CH 08</div>
+    <h1>통계와 카디널리티</h1>
+    <p class="intro">플래너가 계획을 고르려면 "이 조건에 <b>몇 행이나 맞을까?</b>"를 알아야 해요(이 추정값이 <b>카디널리티</b>). 그런데 정확히 세려면 결국 테이블을 다 읽어야 하니 — 그건 풀스캔이라 모순이죠. 그래서 엔진은 <b>미리 모아둔 통계</b>(각 값이 대략 몇 번 나오는지의 요약 = 히스토그램)로 <b>어림</b>해요. 불을 켜고 방을 다 재는 대신, 몇 군데만 보고 "여긴 한 천 명쯤"이라 짐작하는 거예요. 문제는 — 이 어림은 보통 "값들이 <b>고르게</b> 퍼져 있다"고 가정하는데, 실제 데이터가 <b>한쪽에 쏠려</b> 있으면 추정이 크게 빗나가요. 추정이 틀리면 플래너의 비용 계산이 틀리고, 그러면 <b>나쁜 계획</b>을 골라요 — 인덱스가 있는데도 풀스캔을 하거나, 그 반대로요. 이번엔 추정이 어떻게 빗나가고, 그 오류가 어떤 재앙으로 번지는지 봐요.</p>
+  </header>
+
+  <nav class="stepper" id="stepper">
+    <button data-s="0" class="active">00 · 어림하는 이유</button>
+    <button data-s="1">01 · 추정 오류의 재앙</button>
+    <button data-s="2">02 · 오래된 통계</button>
+    <button data-s="3">03 · 정리</button>
+  </nav>
+
+  <!-- STEP 0 -->
+  <section class="panel show" data-panel="0">
+    <span class="kicker" style="color:var(--hot)">Step 00 — Why Estimate</span>
+    <h2>다 세지 않고 어림한다</h2>
+    <p class="lead">행이 1000개인 테이블에서 "값이 정확히 셀까?" — 정확히 세면 그게 풀스캔이라 본말전도예요. 그래서 엔진은 <b>히스토그램</b>(값 구간별 대략의 개수 요약)을 미리 만들어 두고 그걸로 <b>짐작</b>해요. 값이 <b>고르게</b> 퍼져 있으면 이 짐작이 꽤 잘 맞아요 — 추정 막대와 실제 막대가 비슷하죠.</p>
+    <div class="scene" id="s0"></div>
+    <p class="big" id="lab0"></p>
+    <p class="note" style="margin-top:6px">→ 통계 = 데이터의 요약 사진. 고르게 퍼졌을 땐 어림이 잘 들어맞아요.</p>
+  </section>
+
+  <!-- STEP 1 -->
+  <section class="panel" data-panel="1">
+    <span class="kicker" style="color:var(--q)">Step 01 — When Estimates Go Wrong</span>
+    <h2>쏠리면 빗나가고, 빗나가면 재앙</h2>
+    <p class="lead">슬라이더로 데이터의 <b>쏠림</b>을 키워 보세요. 추정은 "고르게 퍼졌다"고 보고 늘 <b>~100행</b>이라 짐작해요. 하지만 실제로 한 값에 쏠리면 그 값엔 <b>수백 행</b>이 맞아요. 추정(100, 적음)을 믿은 플래너는 "선택적이네 → 인덱스!"라 결정하는데, 실제론 수백 행이라 <b>인덱스가 수백 번 흩어진 조회</b>를 해 풀스캔보다 훨씬 느려져요. 추정 막대 ↔ 실제 막대의 간극이 곧 <b>잘못 고른 계획</b>으로 번져요.</p>
+    <div class="ctl"><label>쏠림 정도 <span id="kL" style="color:var(--hot)">없음</span></label><input type="range" id="kv" min="0" max="100" step="10" value="0" style="flex:1"></div>
+    <div class="scene" id="s1"></div>
+    <p class="big" id="lab1"></p>
+    <p class="note" style="margin-top:6px">→ 추정 오류는 그 자체가 문제가 아니라, <b>그걸 믿고 고른 계획</b>이 재앙이에요.</p>
+  </section>
+
+  <!-- STEP 2 -->
+  <section class="panel" data-panel="2">
+    <span class="kicker" style="color:var(--v)">Step 02 — Stale Statistics</span>
+    <h2>통계가 오래되면 더 틀린다</h2>
+    <p class="lead">통계는 <b>과거의 스냅샷</b>이에요. 데이터가 많이 바뀌었는데 통계를 다시 모으지 않으면(오래된/stale 통계), 플래너는 <b>옛날 분포</b>로 추정해 더 크게 빗나가요. 버튼으로 비교하세요 — 최신 통계면 추정이 실제에 가깝고, 오래된 통계면 엉뚱한 계획을 골라요. 그래서 엔진은 주기적으로 통계를 갱신해요(또는 큰 변경 후 수동으로).</p>
+    <div class="toggles" id="stale"></div>
+    <div class="scene" id="s2"></div>
+    <p class="big" id="lab2"></p>
+    <p class="note" style="margin-top:6px">→ "왜 갑자기 쿼리가 느려졌지?"의 흔한 범인 — 데이터는 바뀌었는데 통계가 안 따라온 경우.</p>
+  </section>
+
+  <!-- STEP 3 -->
+  <section class="panel" data-panel="3">
+    <span class="kicker" style="color:var(--good)">Step 03 — Takeaways</span>
+    <h2>정리</h2>
+    <p class="lead">플래너는 "몇 행 맞을까"(<b>카디널리티</b>)를 <b>통계로 어림</b>해요 — 정확히 세는 건 풀스캔이라 모순이니까요. 데이터가 <b>고르면</b> 어림이 잘 맞지만, <b>쏠리거나</b> 통계가 <b>오래되면</b> 크게 빗나가고, 그 오류는 곧 <b>나쁜 계획</b>(인덱스 두고 풀스캔, 혹은 반대)으로 번져요. 그래서 통계 갱신이 성능 관리의 핵심이에요. 다음엔 계획에서 가장 까다로운 부분 — 두 테이블을 잇는 조인 — 의 여러 방식을 봐요.</p>
+    <div class="scene" id="s3"></div>
+    <p class="big" id="lab3"></p>
+    <p class="note" style="margin-top:14px">→ 다음 → <a href="09-joins.html" style="color:var(--q);font-weight:700">CH 09 · 조인</a></p>
+  </section>
+
+  <p class="foot">// 코드 없는 직관 입문 · <a href="index.html">목차</a></p>
+</div>
+
+<script src="shared/lib.js"></script>
+<script src="shared/lib-db.js"></script>
+<script>
+VZ.mountTopnav('#topnav', '08 · 카디널리티');
+VZ.setupStepper();
+const DB=VZ.DB, clamp=VZ.clamp;
+
+// ===== STEP 0: histogram, estimate ~ actual when uniform =====
+(function(){ const W=460,H=160; let s='';
+  const buckets=[100,100,100,100,100,100,100,100,100,100]; // uniform 10 buckets
+  const bw=(W-60)/buckets.length, x0=30, base=120, scale=0.7;
+  buckets.forEach((v,i)=>{ const h=v*scale; s+=`<rect x="${x0+i*bw}" y="${base-h}" width="${bw-4}" height="${h}" rx="2" fill="var(--v)" opacity="0.85"/>`; });
+  s+=`<text x="${W/2}" y="20" text-anchor="middle" font-size="10" font-family="monospace" fill="var(--muted)">히스토그램: 값 구간별 대략의 개수 (1000행, 10구간)</text>`;
+  s+=`<text x="${W/2}" y="${base+16}" text-anchor="middle" font-size="10.5" font-family="monospace" fill="var(--good)" font-weight="700">고르게 퍼짐 → 한 값 검색 추정 ≈ 100행 (실제와 비슷)</text>`;
+  document.getElementById('s0').innerHTML=DB.svg(W,H,s,'히스토그램');
+  document.getElementById('lab0').innerHTML='통계가 데이터를 요약 — <b style="color:var(--good)">고르게 퍼졌을 땐</b> "≈100행" 어림이 잘 맞아요.';
+})();
+
+// ===== STEP 1: skew → estimate vs actual → wrong plan =====
+(function(){ let skew=0; const kv=document.getElementById('kv'), kL=document.getElementById('kL');
+  const LBL=v=>v===0?'없음':v<40?'약간':v<80?'심함':'극심';
+  function render(){ const W=460,H=170;
+    const est=100; // planner assumes uniform: 1000/10
+    const actual=Math.round(100 + (900)*(skew/100)); // skew piles rows into the queried value
+    // 플래너는 늘 추정 100행(=10%)만 보고 인덱스를 고름. 실제 비용은 맞는 행마다 흩어진 조회.
+    const scanCost=100; const idxCostActual=Math.round(actual*0.5+3); // 쏠림 없을 때(actual≈100) idx≈53 < 100(인덱스 승), 쏠리면 폭증
+    const indexChosen = true; // 추정 100행(선택적)으로 보여 항상 인덱스를 고름
+    const ratio=idxCostActual/scanCost;
+    const reallyBad = indexChosen && idxCostActual>scanCost;
+    let s='';
+    // estimate vs actual bars
+    s+=DB.costBar(20,16,420,[{label:'추정(고르다 가정)',cost:est},{label:'실제 맞는 행',cost:actual,picked:true,best:false}],{bh:26,gap:14});
+    s+=`<text x="20" y="100" font-size="10.5" font-family="monospace" fill="${reallyBad?'var(--drop)':'var(--good)'}" font-weight="700">플래너 선택: 인덱스 (추정 ${est}행=10% 보고 "선택적")</text>`;
+    s+=`<text x="20" y="122" font-size="10.5" font-family="monospace" fill="${reallyBad?'var(--drop)':'var(--ink)'}">실제 비용: 인덱스 ${idxCostActual} vs 풀스캔 ${scanCost} → ${reallyBad?'인덱스가 참사 ✗':'인덱스가 더 쌈 ✓'}</text>`;
+    document.getElementById('s1').innerHTML=DB.svg(W,H,s,'추정오류');
+    kL.textContent=LBL(skew);
+    document.getElementById('lab1').innerHTML = reallyBad?`<b style="color:var(--drop)">재앙</b>: 추정 ${est}행(적다)을 믿고 인덱스를 골랐는데, 실제 ${actual}행이라 인덱스가 풀스캔보다 <b>${ratio.toFixed(1)}배</b> 느려요.`:`추정 ${est}행, 실제 ${actual}행 — 아직 선택적이라 인덱스가 풀스캔보다 싸요(계획 무난).`;
+  }
+  kv.oninput=()=>{ skew=+kv.value; render(); };
+  render();
+})();
+
+// ===== STEP 2: stale statistics =====
+(function(){ let mode=0;
+  const el=document.getElementById('stale'); el.innerHTML=`<button data-i="0">최신 통계</button><button data-i="1">오래된 통계</button>`;
+  function render(){ const W=460,H=150; const actual=800; const est = mode===0?780:90; let s='';
+    s+=DB.costBar(20,18,420,[{label:'통계 추정',cost:est,picked:true},{label:'실제',cost:actual,best:false}],{bh:28,gap:16});
+    const ok=Math.abs(est-actual)<200;
+    s+=`<text x="${W/2}" y="108" text-anchor="middle" font-size="11" font-family="monospace" fill="${ok?'var(--good)':'var(--drop)'}" font-weight="700">${ok?'추정 ≈ 실제 → 좋은 계획':'추정이 실제와 딴판 → 엉뚱한 계획'}</text>`;
+    s+=`<text x="${W/2}" y="130" text-anchor="middle" font-size="9.5" font-family="monospace" fill="var(--muted)">데이터는 800행으로 늘었는데, ${mode===0?'통계도 갱신됨':'통계는 옛날(90행)인 채'}</text>`;
+    document.getElementById('s2').innerHTML=DB.svg(W,H,s,mode===0?'최신':'오래됨');
+    document.querySelectorAll('#stale button').forEach((b,i)=>{ const on=i===mode; b.classList.toggle('on',on); b.style.background=on?(i===0?'var(--good)':'var(--drop)'):'var(--panel-2)'; b.style.color=on?'#0b0e14':'var(--muted)'; });
+    document.getElementById('lab2').innerHTML = mode===0?'<b style="color:var(--good)">최신 통계</b>: 추정이 실제에 가까워 좋은 계획.':'<b style="color:var(--drop)">오래된 통계</b>: 옛 분포로 추정 → 크게 빗나가 나쁜 계획.';
+  }
+  el.addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b)return; mode=+b.dataset.i; render(); });
+  render();
+})();
+
+// ===== STEP 3 =====
+(function(){ const W=460,H=110;
+  let s=`<text x="${W/2}" y="26" fill="var(--v)" font-size="12.5" font-family="monospace" text-anchor="middle" font-weight="700">카디널리티 = 통계로 어림한 "맞는 행 수"</text>`;
+  const rows=[['왜 어림','정확히 세면 그게 풀스캔(모순)','var(--q)'],['빗나감','쏠림·오래된 통계 → 나쁜 계획','var(--drop)']];
+  rows.forEach((r,i)=>{ const y=42+i*30; s+=`<rect x="20" y="${y}" width="${W-40}" height="25" rx="6" fill="var(--panel)" stroke="${r[2]}" stroke-width="1.1"/><text x="34" y="${y+16.5}" fill="${r[2]}" font-size="11" font-family="monospace" font-weight="700">${r[0]}</text><text x="${W-34}" y="${y+16.5}" fill="var(--ink)" font-size="9.5" font-family="monospace" text-anchor="end">${r[1]}</text>`; });
+  document.getElementById('s3').innerHTML=DB.svg(W,H,s,'정리');
+  document.getElementById('lab3').innerHTML='계획에서 가장 까다로운 부분 — 두 테이블을 잇는 <b style="color:var(--q)">조인</b>으로.';
+})();
+</script>
+</body>
+</html>

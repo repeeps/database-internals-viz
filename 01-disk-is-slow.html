@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>01 · 디스크는 느리다 — 데이터베이스, 눈으로 보기</title>
+<link rel="stylesheet" href="shared/theme.css">
+<link rel="icon" type="image/svg+xml" href="shared/favicon.svg">
+<style>
+  .big{font-family:'JetBrains Mono',monospace; font-size:14px; color:var(--ink); margin:8px 2px 0;}
+  .ctl{display:flex; align-items:center; gap:10px; margin:10px 0; flex-wrap:wrap;}
+  svg{display:block; width:100%;}
+  .toggles{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
+  .toggles button{font-family:'JetBrains Mono',monospace;font-size:12px;padding:7px 12px;border-radius:8px;background:var(--panel-2);border:1px solid var(--line);color:var(--muted);cursor:pointer}
+  .toggles button.on{color:#0b0e14;font-weight:700}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topnav" id="topnav"></div>
+
+  <header>
+    <div class="tag" style="color:var(--q)">PART A · 저장과 읽기 — CH 01</div>
+    <h1>디스크는 느리다</h1>
+    <p class="intro">데이터베이스의 모든 고민은 한 사실에서 출발해요: <b>디스크는 메모리보다 압도적으로 느려요</b>. 메모리에서 값을 읽는 건 거의 즉시지만, 디스크에서 읽는 건 수천 배 더 걸려요. 그래서 엔진은 디스크를 <b>한 줄씩</b> 읽지 않고 — <b>페이지(블록)</b>라는 고정 크기 묶음(여러 행이 든 종이 한 장)을 통째로 가져와요. 한 행만 필요해도 그 행이 든 페이지 전체를 읽죠. 그리고 한 번 읽은 페이지는 <b>버퍼풀(메모리 캐시)</b>에 얹어 두고 재사용해요 — 두 번째부터는 디스크에 안 가도 되니까요. 마지막으로 디스크 접근에도 종류가 있어요: <b>순차</b>(이어진 페이지를 죽 읽기)는 싸고, <b>랜덤</b>(여기저기 흩어진 페이지)은 비싸요. 이 세 가지 — 페이지 단위·캐시·순차vs랜덤 — 가 앞으로 모든 "비용"의 바탕이에요.</p>
+  </header>
+
+  <nav class="stepper" id="stepper">
+    <button data-s="0" class="active">00 · 메모리 vs 디스크</button>
+    <button data-s="1">01 · 페이지와 버퍼풀</button>
+    <button data-s="2">02 · 순차 vs 랜덤</button>
+    <button data-s="3">03 · 정리</button>
+  </nav>
+
+  <!-- STEP 0 -->
+  <section class="panel show" data-panel="0">
+    <span class="kicker" style="color:var(--hot)">Step 00 — Memory vs Disk</span>
+    <h2>같은 값을 읽는데, 천 배 차이</h2>
+    <p class="lead">같은 한 행을 <b>메모리에서</b> 읽을 때와 <b>디스크에서</b> 읽을 때를 나란히 재생해 보세요. 메모리는 거의 즉시 끝나요. 디스크는 페이지를 찾아 가져오는 동안 한참 기다려야 하죠. 이 차이가 데이터베이스 설계 전체를 지배해요 — "어떻게든 디스크에 덜 가기".</p>
+    <div class="ctl"><button class="btn play" id="go0">▶ 동시에 읽기</button></div>
+    <div class="scene" id="s0"></div>
+    <p class="big" id="lab0"></p>
+    <p class="note" style="margin-top:6px">→ 메모리는 즉시, 디스크는 느림 — 그래서 엔진은 디스크 접근을 최소화하려 애써요.</p>
+  </section>
+
+  <!-- STEP 1 -->
+  <section class="panel" data-panel="1">
+    <span class="kicker" style="color:var(--q)">Step 01 — Page & Buffer Pool</span>
+    <h2>한 행이 필요해도 페이지 통째로 · 캐시</h2>
+    <p class="lead">엔진은 행 하나를 콕 집어 못 읽어요 — 그 행이 든 <b>페이지(여러 행 묶음)를 통째로</b> 가져와요. 그리고 메모리의 <b>버퍼풀</b>에 얹어 둬요. 같은 페이지를 또 찾으면? 버튼으로 비교하세요. <b>캐시 미스</b>: 디스크까지 가서 페이지를 읽어옴(느림). <b>캐시 히트</b>: 버퍼풀에 이미 있어 디스크에 안 감(빠름). 그래서 자주 쓰는 페이지는 점점 빨라져요.</p>
+    <div class="toggles" id="cache"></div>
+    <div class="scene" id="s1"></div>
+    <p class="big" id="lab1"></p>
+    <p class="note" style="margin-top:6px">→ 페이지 단위로 읽고 캐시에 둔다 — "한 번 읽은 건 다시 안 읽기"가 엔진의 기본기.</p>
+  </section>
+
+  <!-- STEP 2 -->
+  <section class="panel" data-panel="2">
+    <span class="kicker" style="color:var(--v)">Step 02 — Sequential vs Random</span>
+    <h2>이어 읽기는 싸고, 흩어 읽기는 비싸다</h2>
+    <p class="lead">버튼으로 비교하세요. <b>순차 읽기</b>: 이어진 페이지를 죽 읽어요 — 한 번 자리 잡으면 줄줄 나와 싸요. <b>랜덤 읽기</b>: 여기저기 흩어진 페이지를 따로따로 찾아가요 — 매번 새로 자리를 잡아야 해 비싸요(옛 디스크는 물리적 <b>탐색</b> 때문에, SSD도 <b>페이지마다 드는 오버헤드</b> 때문에). 같은 페이지 수라도 <b>어떻게 흩어졌나</b>로 비용이 갈려요.</p>
+    <div class="toggles" id="acc"></div>
+    <div class="scene" id="s2"></div>
+    <p class="big" id="lab2"></p>
+    <p class="note" style="margin-top:6px">→ 풀스캔(순차)이 의외로 빠른 이유, 랜덤 인덱스 조회가 의외로 비싼 이유의 씨앗이에요.</p>
+  </section>
+
+  <!-- STEP 3 -->
+  <section class="panel" data-panel="3">
+    <span class="kicker" style="color:var(--good)">Step 03 — Takeaways</span>
+    <h2>정리</h2>
+    <p class="lead">디스크는 메모리보다 <b>수천 배 느려요</b>. 그래서 엔진은 ① <b>페이지 단위</b>로 읽고(행 하나라도 페이지 통째), ② <b>버퍼풀</b>에 캐시해 재사용하고, ③ <b>순차</b>를 선호하고 <b>랜덤</b>을 피해요. 데이터베이스 성능 이야기는 거의 다 "디스크에 몇 번 가나, 어떻게 가나"로 환원돼요. 다음엔 인덱스가 없을 때 가장 단순하지만 가장 비싼 읽기 — 풀 스캔 — 을 비용의 기준점으로 세워요.</p>
+    <div class="scene" id="s3"></div>
+    <p class="big" id="lab3"></p>
+    <p class="note" style="margin-top:14px">→ 다음 → <a href="02-full-scan.html" style="color:var(--q);font-weight:700">CH 02 · 비용의 언어 · 풀 스캔</a></p>
+  </section>
+
+  <p class="foot">// 코드 없는 직관 입문 · <a href="index.html">목차</a></p>
+</div>
+
+<script src="shared/lib.js"></script>
+<script src="shared/lib-db.js"></script>
+<script>
+VZ.mountTopnav('#topnav', '01 · 디스크는 느리다');
+VZ.setupStepper();
+const DB=VZ.DB, clamp=VZ.clamp;
+
+// ===== STEP 0: memory vs disk race =====
+(function(){ let cancel=null; const W=460,H=170;
+  function frame(p){ let s='';
+    // memory lane (finishes at p~0.05), disk lane (finishes at p~1)
+    s+=`<text x="20" y="30" fill="var(--good)" font-size="11" font-family="monospace" font-weight="700">메모리에서 읽기</text>`;
+    const memDone = p>=0.05;
+    s+=`<rect x="20" y="38" width="${memDone?180:Math.max(4,p/0.05*180)}" height="22" rx="5" fill="var(--good)" opacity="0.9"/>`;
+    if(memDone) s+=`<text x="210" y="54" font-size="10" font-family="monospace" fill="var(--good)">✓ 즉시</text>`;
+    s+=`<text x="20" y="92" fill="var(--q)" font-size="11" font-family="monospace" font-weight="700">디스크에서 읽기</text>`;
+    const dw=Math.max(4,p*400);
+    s+=`<rect x="20" y="100" width="${dw}" height="22" rx="5" fill="var(--q)" opacity="0.9"/>`;
+    // moving page fetch packet
+    if(p<1) s+=DB.packet(20+dw, 111, {color:'var(--hot)',r:6});
+    if(p>=1) s+=`<text x="430" y="116" text-anchor="end" font-size="10" font-family="monospace" fill="var(--q)">✓ 페이지 도착</text>`;
+    s+=`<text x="${W/2}" y="150" fill="var(--muted)" font-size="10.5" font-family="monospace" text-anchor="middle">같은 한 행 — 메모리는 끝났는데 디스크는 아직 페이지를 가져오는 중</text>`;
+    document.getElementById('s0').innerHTML=DB.svg(W,H,s,'메모리vs디스크');
+    document.getElementById('lab0').innerHTML = p<1?'읽는 중…':'<b style="color:var(--good)">메모리</b>는 진작 끝났고 <b style="color:var(--q)">디스크</b>가 한참 뒤에 도착 — 이 격차가 핵심.';
+  }
+  document.getElementById('go0').onclick=()=>{ if(cancel)cancel(); cancel=VZ.LA.tween(p=>frame(p),2400,()=>frame(1)); };
+  frame(1);
+})();
+
+// ===== STEP 1: page & buffer pool (hit vs miss) =====
+(function(){ let mode=0;
+  const el=document.getElementById('cache'); el.innerHTML=`<button data-i="0">캐시 미스 (처음)</button><button data-i="1">캐시 히트 (재방문)</button>`;
+  function render(){ const W=460,H=180; const hit=mode===1; let s='';
+    // buffer pool (memory) top, disk bottom
+    s+=`<text x="40" y="26" fill="var(--good)" font-size="10" font-family="monospace" font-weight="700">버퍼풀 (메모리 캐시)</text>`;
+    s+=DB.page(40,32,90,64,'페이지 7', hit?[{label:'r·캐시됨',state:'ok'}]:[{label:'(없음)'}], {cached:hit, color:hit?'var(--good)':'var(--line)', dash:hit?null:'4 3'});
+    s+=`<text x="300" y="26" fill="var(--q)" font-size="10" font-family="monospace" font-weight="700">디스크</text>`;
+    s+=DB.page(300,32,90,64,'페이지 7',[{label:'r1'},{label:'r2',state:'data'},{label:'r3'}], {color:'var(--q)'});
+    // arrow: miss goes to disk; hit served from buffer
+    if(hit){ s+=DB.edge(130,64,180,64,{color:'var(--good)',lw:2}); s+=`<text x="200" y="60" fill="var(--good)" font-size="11" font-family="monospace">바로 반환 ✓</text>`; }
+    else { s+=DB.edge(300,90,130,90,{color:'var(--hot)',lw:1.8}); s+=`<text x="215" y="84" fill="var(--hot)" font-size="10" font-family="monospace" text-anchor="middle">디스크서 페이지 읽어 올림</text>`; }
+    s+=`<text x="${W/2}" y="150" fill="var(--muted)" font-size="10" font-family="monospace" text-anchor="middle">${hit?'이미 버퍼풀에 있어 디스크에 안 감 — 빠름':'버퍼풀에 없어 디스크까지 가야 함 — 느림 (대신 이제 캐시됨)'}</text>`;
+    s+=`<text x="${W/2}" y="170" fill="var(--faint)" font-size="9" font-family="monospace" text-anchor="middle">한 행만 필요해도 페이지(r1·r2·r3) 통째로 읽어와요</text>`;
+    document.getElementById('s1').innerHTML=DB.svg(W,H,s,hit?'캐시히트':'캐시미스');
+    document.querySelectorAll('#cache button').forEach((b,i)=>{ const on=i===mode; b.classList.toggle('on',on); b.style.background=on?(i===0?'var(--hot)':'var(--good)'):'var(--panel-2)'; b.style.color=on?'#0b0e14':'var(--muted)'; });
+    document.getElementById('lab1').innerHTML = hit?'<b style="color:var(--good)">캐시 히트</b>: 버퍼풀에 있어 디스크 안 감 — 두 번째부터 빠름.':'<b style="color:var(--hot)">캐시 미스</b>: 디스크까지 가 페이지 통째로 읽어옴 — 느림.';
+  }
+  el.addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b)return; mode=+b.dataset.i; render(); });
+  render();
+})();
+
+// ===== STEP 2: sequential vs random =====
+(function(){ let mode=0;
+  const el=document.getElementById('acc'); el.innerHTML=`<button data-i="0">순차 읽기 (이어서)</button><button data-i="1">랜덤 읽기 (흩어져)</button>`;
+  function render(){ const W=460,H=160; const N=8; let s='';
+    // 8 pages laid out in a row; sequential reads 0..4 contiguous, random reads scattered
+    const seqIdx=[0,1,2,3,4], rndIdx=[1,5,2,7,0];
+    const read = mode===0?seqIdx:rndIdx;
+    const pw=44, gap=6, x0=24, y=44;
+    for(let i=0;i<N;i++){ const order=read.indexOf(i); const on=order>=0;
+      s+=`<rect x="${x0+i*(pw+gap)}" y="${y}" width="${pw}" height="40" rx="5" fill="${on?'var(--q)':'var(--panel)'}" opacity="${on?0.9:1}" stroke="var(--line)"/>`;
+      s+=`<text x="${x0+i*(pw+gap)+pw/2}" y="${y+24}" text-anchor="middle" font-size="10" font-family="monospace" fill="${on?'#0b0e14':'var(--muted)'}">P${i}</text>`;
+      if(on) s+=`<text x="${x0+i*(pw+gap)+pw/2}" y="${y-6}" text-anchor="middle" font-size="9" font-family="monospace" fill="var(--hot)">${order+1}</text>`;
+    }
+    // draw the head path between consecutive reads
+    for(let k=0;k<read.length-1;k++){ const a=read[k],b=read[k+1]; const ax=x0+a*(pw+gap)+pw/2, bx=x0+b*(pw+gap)+pw/2;
+      const jump=Math.abs(b-a)>1; s+=`<path d="M${ax} ${y+46} Q ${(ax+bx)/2} ${y+46+(jump?28:10)} ${bx} ${y+46}" fill="none" stroke="${jump?'var(--drop)':'var(--good)'}" stroke-width="1.6"${jump?' stroke-dasharray="4 3"':''}/>`; }
+    const cost = mode===0?5:13; // sequential cheap, random expensive (penalty per jump)
+    s+=`<text x="${W/2}" y="138" fill="${mode===0?'var(--good)':'var(--drop)'}" font-size="11.5" font-family="monospace" text-anchor="middle" font-weight="700">${mode===0?'이어진 5장 — 비용 ≈ 5 (싸다)':'흩어진 5장 — 비용 ≈ 13 (점프마다 추가)'}</text>`;
+    document.getElementById('s2').innerHTML=DB.svg(W,H,s,mode===0?'순차':'랜덤');
+    document.querySelectorAll('#acc button').forEach((b,i)=>{ const on=i===mode; b.classList.toggle('on',on); b.style.background=on?(i===0?'var(--good)':'var(--drop)'):'var(--panel-2)'; b.style.color=on?'#0b0e14':'var(--muted)'; });
+    document.getElementById('lab2').innerHTML = mode===0?'<b style="color:var(--good)">순차</b>: 이어 읽어 점프가 없어요 — 같은 5장인데 싸요.':'<b style="color:var(--drop)">랜덤</b>: 점프마다 새로 자리잡기 — 같은 5장인데 더 비싸요(장치 따라 수 배~수십 배+).';
+  }
+  el.addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b)return; mode=+b.dataset.i; render(); });
+  render();
+})();
+
+// ===== STEP 3 =====
+(function(){ const W=460,H=130;
+  let s=`<text x="${W/2}" y="26" fill="var(--q)" font-size="12.5" font-family="monospace" text-anchor="middle" font-weight="700">성능 = "디스크에 몇 번, 어떻게 가나"</text>`;
+  const rows=[['페이지 단위','한 행이라도 페이지 통째로 읽음','var(--q)'],['버퍼풀','한 번 읽은 페이지는 캐시해 재사용','var(--good)'],['순차 ≫ 랜덤','이어 읽기는 싸고 흩어 읽기는 비쌈','var(--v)']];
+  rows.forEach((r,i)=>{ const y=40+i*28; s+=`<rect x="20" y="${y}" width="${W-40}" height="23" rx="6" fill="var(--panel)" stroke="${r[2]}" stroke-width="1.1"/><text x="34" y="${y+15.5}" fill="${r[2]}" font-size="11" font-family="monospace" font-weight="700">${r[0]}</text><text x="${W-34}" y="${y+15.5}" fill="var(--ink)" font-size="9.5" font-family="monospace" text-anchor="end">${r[1]}</text>`; });
+  document.getElementById('s3').innerHTML=DB.svg(W,H,s,'정리');
+  document.getElementById('lab3').innerHTML='이제 가장 단순하고 비싼 읽기 — <b style="color:var(--q)">풀 스캔</b> — 을 비용의 기준점으로.';
+})();
+</script>
+</body>
+</html>

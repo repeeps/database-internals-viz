@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>09 · 조인 — 데이터베이스, 눈으로 보기</title>
+<link rel="stylesheet" href="shared/theme.css">
+<link rel="icon" type="image/svg+xml" href="shared/favicon.svg">
+<style>
+  .big{font-family:'JetBrains Mono',monospace; font-size:14px; color:var(--ink); margin:8px 2px 0;}
+  .ctl{display:flex; align-items:center; gap:10px; margin:10px 0; flex-wrap:wrap;}
+  svg{display:block; width:100%;}
+  .toggles{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
+  .toggles button{font-family:'JetBrains Mono',monospace;font-size:12px;padding:7px 12px;border-radius:8px;background:var(--panel-2);border:1px solid var(--line);color:var(--muted);cursor:pointer}
+  .toggles button.on{color:#0b0e14;font-weight:700}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topnav" id="topnav"></div>
+
+  <header>
+    <div class="tag" style="color:var(--v)">PART C · 쿼리 실행 — CH 09</div>
+    <h1>조인</h1>
+    <p class="intro">조인은 <b>두 테이블을 키로 이어 붙이는</b> 일이에요 — 예컨대 '주문' 테이블의 고객번호와 '고객' 테이블의 번호를 맞춰, 주문마다 고객 이름을 붙이는 거죠. 결과는 같아도, 엔진이 이걸 <b>해내는 방법은 세 가지</b>가 있고 각자 잘하는 상황이 달라요. <b>Nested Loop</b>(중첩 반복): 한쪽을 한 행씩 들고 다른 쪽에서 짝을 찾기 — 한쪽이 <b>아주 작거나</b> 짝 찾는 쪽에 <b>인덱스가 있을 때</b> 빨라요. <b>Hash Join</b>: 한쪽으로 해시 테이블을 만들어 다른 쪽을 던져 맞추기 — <b>대용량·비정렬·등치(=) 조인</b>에 강해요(부등호 범위 조인엔 못 써요). <b>Merge Join</b>: 양쪽을 정렬해 지퍼처럼 나란히 맞추기 — 양쪽이 <b>이미 정렬돼 있을 때</b>(인덱스 순서 등) 최고예요. 플래너는 데이터 크기·정렬 여부·인덱스를 보고 <b>그때그때 다른 방식</b>을 골라요. "조인 알고리즘 하나가 늘 최고"는 없어요.</p>
+  </header>
+
+  <nav class="stepper" id="stepper">
+    <button data-s="0" class="active">00 · 조인이란</button>
+    <button data-s="1">01 · 조인 레이스</button>
+    <button data-s="2">02 · 셋의 장기</button>
+    <button data-s="3">03 · 정리</button>
+  </nav>
+
+  <!-- STEP 0 -->
+  <section class="panel show" data-panel="0">
+    <span class="kicker" style="color:var(--hot)">Step 00 — What's a Join</span>
+    <h2>키로 이어 붙이기</h2>
+    <p class="lead">'주문'의 <b>고객번호</b>와 '고객'의 <b>번호</b>를 맞춰 이어 붙여요. 재생하면 주문 한 건의 고객번호로 고객 테이블에서 짝을 찾아 이름을 붙이는 게 보여요. 이게 조인의 본질 — <b>한쪽 키 ↔ 다른 쪽 키 매칭</b>. 방법은 여럿이지만 결과는 같아요.</p>
+    <div class="ctl"><button class="btn play" id="go0">▶ 매칭</button></div>
+    <div class="scene" id="s0"></div>
+    <p class="big" id="lab0"></p>
+    <p class="note" style="margin-top:6px">→ 조인 = 두 테이블을 키로 잇기. "어떻게 짝을 찾나"가 세 알고리즘의 차이예요.</p>
+  </section>
+
+  <!-- STEP 1 -->
+  <section class="panel" data-panel="1">
+    <span class="kicker" style="color:var(--q)">Step 01 — The Join Race</span>
+    <h2>크기에 따라 우승자가 바뀐다</h2>
+    <p class="lead">세 알고리즘을 같은 조인에 붙여 경주시켜요. 슬라이더로 <b>테이블 크기</b>를 바꿔 보세요. <b>작을 때</b>: Nested Loop이 가벼워 이겨요(시작 비용이 거의 없음). <b>중간</b>: Merge가 균형으로 앞서고. <b>클 때</b>: Hash가 한 번씩만 훑어(선형) 압승해요. 막대가 짧을수록 빠른 거예요 — 우승자(초록)가 크기 따라 바뀌는 걸 보세요.</p>
+    <div class="ctl"><label>테이블 크기 <span id="nL" style="color:var(--hot)">10</span></label><input type="range" id="nv" min="5" max="200" step="5" value="10" style="flex:1"></div>
+    <div class="scene" id="s1"></div>
+    <p class="big" id="lab1"></p>
+    <p class="note" style="margin-top:6px">→ "늘 최고인 조인"은 없어요 — 크기·정렬·인덱스로 우승자가 바뀌니 플래너가 매번 골라요.</p>
+  </section>
+
+  <!-- STEP 2 -->
+  <section class="panel" data-panel="2">
+    <span class="kicker" style="color:var(--v)">Step 02 — Each One's Strength</span>
+    <h2>셋은 언제 빛나나</h2>
+    <p class="lead">각 방식을 눌러 장기와 약점을 보세요. <b>Nested Loop</b>: 한쪽이 아주 작거나 짝 찾는 쪽에 인덱스가 있으면 최고 — 단 양쪽 다 크면 곱셈으로 폭발. <b>Hash Join</b>: 대용량 비정렬 등치(=) 조인에 강함 — 해시를 메모리에 올려야 하고 부등호(범위) 조인엔 못 씀. <b>Merge Join</b>: 양쪽이 이미 정렬돼 있으면(인덱스 순서) 지퍼처럼 한 번에 — 정렬이 안 돼 있으면 정렬 비용이 듦.</p>
+    <div class="toggles" id="alg"></div>
+    <div class="scene" id="s2"></div>
+    <p class="big" id="lab2"></p>
+    <p class="note" style="margin-top:6px">→ 세 도구의 상자 — 플래너가 데이터 상황(통계!)을 보고 그중 맞는 걸 꺼내요.</p>
+  </section>
+
+  <!-- STEP 3 -->
+  <section class="panel" data-panel="3">
+    <span class="kicker" style="color:var(--good)">Step 03 — Takeaways</span>
+    <h2>정리 — PART C를 닫으며</h2>
+    <p class="lead">조인은 두 테이블을 키로 잇는 일이고, <b>Nested Loop</b>(작은쪽·인덱스) · <b>Hash</b>(대용량·비정렬·등치) · <b>Merge</b>(이미 정렬됨) 세 방식이 각자 다른 상황에서 이겨요. 플래너는 통계로 크기·선택도를 추정해 <b>그때그때 다른 조인</b>을 골라요 — 그래서 통계가 틀리면 조인 선택도 틀어지죠. 여기까지가 "빨리, 똑똑하게 찾기"(PART A~C)예요. 이제 데이터베이스의 다른 절반 — <b>여럿이 동시에 안전하게 바꾸기</b> — 로 넘어가요.</p>
+    <div class="scene" id="s3"></div>
+    <p class="big" id="lab3"></p>
+    <p class="note" style="margin-top:14px">→ 다음 → <a href="10-transaction.html" style="color:var(--q);font-weight:700">CH 10 · 트랜잭션 · ACID</a></p>
+  </section>
+
+  <p class="foot">// 코드 없는 직관 입문 · <a href="index.html">목차</a></p>
+</div>
+
+<script src="shared/lib.js"></script>
+<script src="shared/lib-db.js"></script>
+<script>
+VZ.mountTopnav('#topnav', '09 · 조인');
+VZ.setupStepper();
+const DB=VZ.DB, clamp=VZ.clamp;
+
+// ===== STEP 0: join matching =====
+(function(){ let cancel=null; const W=460,H=200;
+  const orders=[['#1','고객 7'],['#2','고객 3'],['#3','고객 7']];
+  const custs=[['3','Bob'],['7','Ann'],['9','Cy']];
+  function frame(p){ let s='';
+    s+=`<text x="110" y="18" text-anchor="middle" font-size="10" font-family="monospace" fill="var(--q)" font-weight="700">주문</text>`;
+    s+=DB.ledger(20,24,180,['주문','고객번호'], orders.map((r,i)=>({cells:r, state: (p>0.1&&i===0)?'active':''})), {rh:26});
+    s+=`<text x="350" y="18" text-anchor="middle" font-size="10" font-family="monospace" fill="var(--v)" font-weight="700">고객</text>`;
+    s+=DB.ledger(260,24,180,['번호','이름'], custs.map((r,i)=>({cells:r, state:(p>0.5&&r[0]==='7')?'ok':''})), {rh:26});
+    // arrow from order #1 (고객7) to cust 7(Ann) when p>0.3
+    if(p>0.3){ const oy=24+26+0*26+13, cy=24+26+1*26+13; s+=DB.edge(200,oy,260,cy,{color:'var(--hot)',lw:1.8,dash:p<0.6?'4 3':null}); }
+    if(p>=1) s+=`<text x="${W/2}" y="150" text-anchor="middle" font-size="11.5" font-family="monospace" fill="var(--good)" font-weight="700">주문 #1 + 고객 'Ann' → 이어 붙임</text>`;
+    document.getElementById('s0').innerHTML=DB.svg(W,H,s,'조인매칭');
+    document.getElementById('lab0').innerHTML = p<1?'주문의 고객번호로 고객 테이블에서 짝을 찾는 중…':'<b style="color:var(--good)">매칭 완료</b>: 주문#1(고객7) ↔ 고객7(Ann). 키로 이어 붙였어요.';
+  }
+  document.getElementById('go0').onclick=()=>{ if(cancel)cancel(); cancel=VZ.LA.tween(p=>frame(p),2200,()=>frame(1)); };
+  frame(1);
+})();
+
+// ===== STEP 1: join race =====
+(function(){ let N=10; const nv=document.getElementById('nv'), nL=document.getElementById('nL');
+  function costs(n){ return {
+    NL: Math.round(4 + n*1.4),
+    Merge: Math.round(18 + n*0.8),
+    Hash: Math.round(35 + n*0.5),
+  }; }
+  function render(){ const W=460,H=160; const c=costs(N);
+    const min=Math.min(c.NL,c.Merge,c.Hash);
+    const items=[
+      {label:'Nested Loop',cost:c.NL,best:c.NL===min,picked:c.NL===min},
+      {label:'Merge',cost:c.Merge,best:c.Merge===min,picked:c.Merge===min},
+      {label:'Hash',cost:c.Hash,best:c.Hash===min,picked:c.Hash===min},
+    ];
+    let s=DB.costBar(20,20,420,items,{bh:28,gap:16});
+    s+=`<text x="${W/2}" y="146" text-anchor="middle" font-size="9.5" font-family="monospace" fill="var(--muted)">막대 짧을수록 빠름 · 크기 ${N} (양쪽 테이블)</text>`;
+    document.getElementById('s1').innerHTML=DB.svg(W,H,s,'조인레이스');
+    const winner = c.NL===min?'Nested Loop':c.Merge===min?'Merge':'Hash';
+    const why = winner==='Nested Loop'?'작아서 시작 비용 적은 NL이 이김':winner==='Merge'?'중간 크기 — 균형 잡힌 Merge가 앞섬':'커서 한 번씩만 훑는 Hash가 압승';
+    document.getElementById('lab1').innerHTML = `크기 ${N}: <b style="color:var(--good)">${winner}</b> 우승 — ${why}.`;
+  }
+  nv.oninput=()=>{ N=+nv.value; nL.textContent=N; render(); };
+  render();
+})();
+
+// ===== STEP 2: each strength =====
+(function(){ let mode=0;
+  const A=[
+    {k:'Nested Loop',c:'var(--q)',good:'한쪽이 아주 작거나, 짝 찾는 쪽에 인덱스가 있을 때',bad:'양쪽 다 크면 곱셈으로 폭발(N×M)'},
+    {k:'Hash Join',c:'var(--v)',good:'대용량·비정렬·등치(=) 조인 — 한 번씩만 훑음(선형)',bad:'해시를 메모리에 올려야 함 · 부등호(범위) 조인엔 못 씀'},
+    {k:'Merge Join',c:'var(--pink)',good:'양쪽이 이미 정렬돼 있으면(인덱스 순서) 지퍼처럼 한 번에',bad:'정렬 안 돼 있으면 정렬 비용이 추가됨'},
+  ];
+  const el=document.getElementById('alg'); el.innerHTML=A.map((a,i)=>`<button data-i="${i}">${a.k}</button>`).join('');
+  function render(){ const W=460,H=150; const a=A[mode]; let s='';
+    s+=`<rect x="16" y="16" width="${W-32}" height="${H-32}" rx="12" fill="var(--panel)" stroke="${a.c}"/>`;
+    s+=`<text x="34" y="44" fill="${a.c}" font-size="14" font-family="monospace" font-weight="700">${a.k}</text>`;
+    s+=`<text x="34" y="74" fill="var(--good)" font-size="11" font-family="monospace">✓ 장기</text>`;
+    s+=`<foreignObject x="34" y="80" width="${W-70}" height="30"><div xmlns="http://www.w3.org/1999/xhtml" style="font-family:monospace;font-size:11px;line-height:1.5;color:#cdd6f4">${a.good}</div></foreignObject>`;
+    s+=`<text x="34" y="118" fill="var(--drop)" font-size="11" font-family="monospace">✗ 약점</text>`;
+    s+=`<foreignObject x="34" y="124" width="${W-70}" height="24"><div xmlns="http://www.w3.org/1999/xhtml" style="font-family:monospace;font-size:11px;line-height:1.5;color:#cdd6f4">${a.bad}</div></foreignObject>`;
+    document.getElementById('s2').innerHTML=DB.svg(W,H,s,a.k);
+    document.querySelectorAll('#alg button').forEach((b,i)=>{ const on=i===mode; b.classList.toggle('on',on); b.style.background=on?A[i].c:'var(--panel-2)'; b.style.color=on?'#0b0e14':'var(--muted)'; });
+    document.getElementById('lab2').innerHTML = `<b style="color:${a.c}">${a.k}</b> — ${a.good.split('—')[0]}`;
+  }
+  el.addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b)return; mode=+b.dataset.i; render(); });
+  render();
+})();
+
+// ===== STEP 3 =====
+(function(){ const W=460,H=130;
+  let s=`<text x="${W/2}" y="26" fill="var(--v)" font-size="12" font-family="monospace" text-anchor="middle" font-weight="700">늘 최고인 조인은 없다 — 상황 따라 우승자가 바뀜</text>`;
+  const rows=[['Nested Loop','작은쪽 · 인덱스','var(--q)'],['Hash','대용량 · 비정렬 · 등치','var(--v)'],['Merge','양쪽 이미 정렬됨','var(--pink)']];
+  rows.forEach((r,i)=>{ const y=40+i*28; s+=`<rect x="20" y="${y}" width="${W-40}" height="23" rx="6" fill="var(--panel)" stroke="${r[2]}" stroke-width="1.1"/><text x="34" y="${y+15.5}" fill="${r[2]}" font-size="11" font-family="monospace" font-weight="700">${r[0]}</text><text x="${W-34}" y="${y+15.5}" fill="var(--ink)" font-size="9.5" font-family="monospace" text-anchor="end">${r[1]}</text>`; });
+  document.getElementById('s3').innerHTML=DB.svg(W,H,s,'정리');
+  document.getElementById('lab3').innerHTML='여기까지 "빨리 찾기". 이제 다른 절반 — <b style="color:var(--q)">안전하게 바꾸기</b>(트랜잭션).';
+})();
+</script>
+</body>
+</html>

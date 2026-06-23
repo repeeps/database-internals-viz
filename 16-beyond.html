@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>16 · 너머 · 마무리 — 데이터베이스, 눈으로 보기</title>
+<link rel="stylesheet" href="shared/theme.css">
+<link rel="icon" type="image/svg+xml" href="shared/favicon.svg">
+<style>
+  .big{font-family:'JetBrains Mono',monospace; font-size:14px; color:var(--ink); margin:8px 2px 0;}
+  .ctl{display:flex; align-items:center; gap:10px; margin:10px 0; flex-wrap:wrap;}
+  svg{display:block; width:100%;}
+  .toggles{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
+  .toggles button{font-family:'JetBrains Mono',monospace;font-size:12px;padding:7px 12px;border-radius:8px;background:var(--panel-2);border:1px solid var(--line);color:var(--muted);cursor:pointer}
+  .toggles button.on{color:#0b0e14;font-weight:700}
+  .links{display:flex;gap:12px;flex-wrap:wrap;margin:14px 0}
+  .links a{flex:1;min-width:200px;text-decoration:none;background:var(--panel-2);border:1px solid var(--line);border-radius:12px;padding:14px 16px;color:var(--ink);transition:border-color .15s}
+  .links a:hover{border-color:var(--q)}
+  .links .t{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:14px;margin-bottom:4px}
+  .links .d{font-size:12px;color:var(--muted);line-height:1.5}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topnav" id="topnav"></div>
+
+  <header>
+    <div class="tag" style="color:var(--good)">PART E · 내구성과 확장 — CH 16</div>
+    <h1>너머 · 마무리</h1>
+    <p class="intro">여기까지가 데이터베이스 <b>엔진의 알맹이</b>예요 — 디스크에서 빨리 찾고(저장·인덱스·실행), 여럿이 안전하게 바꾸고(트랜잭션·MVCC), 크래시와 규모를 견디기(WAL·복제). 우리가 본 건 주로 <b>행 단위로 거래를 처리하는</b> 전통적 데이터베이스(OLTP)예요. 하지만 같은 원리를 <b>다르게 조합</b>한 다른 풍경도 많아요: 분석용으로 열 단위로 저장하는 <b>컬럼스토어(OLAP)</b>, 스키마를 느슨하게 푼 <b>NoSQL</b>(문서·키값·그래프), 메모리에 다 올려 극한 속도를 낸 <b>인메모리·캐시</b> 등. 전부 "어떤 트레이드오프를 택하느냐"의 다른 선택일 뿐, 바탕의 고민(찾기·안전·내구·확장)은 같아요. 마지막으로 처음의 <b>종이 장부</b>로 돌아가 봐요 — 이제 그 단순한 표 안에서 B+tree가 길을 내고, 플래너가 길을 고르고, 트랜잭션이 동시 수정을 막고, 로그가 정전을 견디는 게 <b>다 보일</b> 거예요.</p>
+  </header>
+
+  <nav class="stepper" id="stepper">
+    <button data-s="0" class="active">00 · 행 vs 열 (OLTP/OLAP)</button>
+    <button data-s="1">01 · 다른 풍경들</button>
+    <button data-s="2">02 · 다시 종이 장부로</button>
+    <button data-s="3">03 · 마무리</button>
+  </nav>
+
+  <!-- STEP 0 -->
+  <section class="panel show" data-panel="0">
+    <span class="kicker" style="color:var(--hot)">Step 00 — Rows vs Columns</span>
+    <h2>거래 처리 vs 분석</h2>
+    <p class="lead">우리가 본 엔진은 <b>행 단위 저장(OLTP)</b> — "고객 한 명의 모든 정보"를 한 줄로 모아 둬, 한 건의 거래(주문·결제)를 빠르게 읽고 써요. 반대로 <b>분석(OLAP)</b>은 "모든 고객의 나이 평균" 같은 질문이라, <b>한 열만 죽 훑는</b> 게 유리해요 — 그래서 <b>열 단위 저장(컬럼스토어)</b>을 써요. 버튼으로 비교하세요. 같은 데이터라도 <b>질문의 모양</b>에 따라 행으로 담을지 열로 담을지가 갈려요.</p>
+    <div class="toggles" id="store"></div>
+    <div class="scene" id="s0"></div>
+    <p class="big" id="lab0"></p>
+    <p class="note" style="margin-top:6px">→ OLTP(거래)=행 저장, OLAP(분석)=열 저장. 둘 다 우리가 본 원리 위에서 다르게 조합한 것.</p>
+  </section>
+
+  <!-- STEP 1 -->
+  <section class="panel" data-panel="1">
+    <span class="kicker" style="color:var(--q)">Step 01 — Other Landscapes</span>
+    <h2>한눈에 보는 풍경 지도</h2>
+    <p class="lead">데이터베이스 세계엔 다른 갈래도 많아요 — 항목을 눌러 "무엇을 얻고 무엇을 포기했나"를 보세요. 전부 우리가 본 트레이드오프(일관성·속도·유연성·확장)의 <b>다른 조합</b>이에요. 새 마법이 아니라, 같은 저울을 다르게 기울인 거죠.</p>
+    <div class="toggles" id="land"></div>
+    <div class="scene" id="s1"></div>
+    <p class="big" id="lab1"></p>
+    <p class="note" style="margin-top:6px">→ 모든 데이터 저장소는 같은 질문에 답해요 — "어떻게 빨리 찾고, 안전하게 바꾸고, 견디고, 키우나".</p>
+  </section>
+
+  <!-- STEP 2 -->
+  <section class="panel" data-panel="2">
+    <span class="kicker" style="color:var(--v)">Step 02 — Back to the Ledger</span>
+    <h2>이제 장부 안이 다 보인다</h2>
+    <p class="lead">0번의 종이 장부로 돌아왔어요. 그땐 "찾기 느림 + 동시 수정 깨짐"이라는 두 문제만 보였죠. 이제 그 단순한 표 안에서 벌어지는 일이 보일 거예요 — 줄을 눌러 어느 챕터가 그 일을 맡는지 확인하세요. 한 잣대로 요약하면: <b>"빨리·똑똑하게 찾기"(A~C)</b>와 <b>"안전하게 바꾸고 견디기"(D~E)</b>. 이 두 축이 데이터베이스의 전부예요.</p>
+    <div class="scene" id="s2"></div>
+    <p class="big" id="lab2"></p>
+    <p class="note" style="margin-top:6px">→ 수미상관: 종이 장부의 두 고민이 16챕터의 두 기둥(인덱스 · 트랜잭션)으로 풀렸어요.</p>
+  </section>
+
+  <!-- STEP 3 -->
+  <section class="panel" data-panel="3">
+    <span class="kicker" style="color:var(--good)">Step 03 — Wrap-up</span>
+    <h2>마무리</h2>
+    <p class="lead">데이터베이스는 결국 <b>"디스크 위 거대한 표를 빨리 찾고, 여럿이 안전하게 바꾸는"</b> 기술이에요. 페이지·인덱스·B+tree로 찾고, 플래너로 길을 고르고, 트랜잭션·격리·MVCC로 동시 수정을 다스리고, WAL·복제로 견뎌요. 이제 SQL을 쓸 때 그 아래에서 무슨 일이 벌어지는지 — 왜 이 인덱스가 안 먹히는지, 왜 이 쿼리가 느린지, 왜 이 격리수준이 필요한지 — <b>그림으로 보일</b> 거예요. 이 알맹이는 자매 트랙들과도 이어져요.</p>
+    <div class="links" id="sister"></div>
+    <div class="scene" id="s3"></div>
+    <p class="big" id="lab3"></p>
+    <p class="note" style="margin-top:14px">→ <a href="index.html" style="color:var(--q);font-weight:700">목차로 돌아가기</a></p>
+  </section>
+
+  <p class="foot">// 코드 없는 직관 입문 · <a href="index.html">목차</a></p>
+</div>
+
+<script src="shared/lib.js"></script>
+<script src="shared/lib-db.js"></script>
+<script>
+VZ.mountTopnav('#topnav', '16 · 너머');
+VZ.setupStepper();
+const DB=VZ.DB;
+
+// ===== STEP 0: row vs column store =====
+(function(){ let mode=0;
+  const el=document.getElementById('store'); el.innerHTML=`<button data-i="0">행 저장 (OLTP)</button><button data-i="1">열 저장 (OLAP)</button>`;
+  function render(){ const W=460,H=170; let s='';
+    // 3 rows x 3 cols table: 이름/나이/도시
+    const head=['이름','나이','도시']; const data=[['Ann','29','서울'],['Bob','34','부산'],['Cy','41','대구']];
+    const cw=90,rh=28,x0=90,y0=40;
+    // header
+    head.forEach((h,c)=>s+=`<text x="${x0+c*cw+cw/2}" y="${y0-6}" text-anchor="middle" font-size="10" font-family="monospace" fill="var(--muted)">${h}</text>`);
+    for(let r=0;r<3;r++)for(let c=0;c<3;c++){
+      const grouped = mode===0? r : c; // row mode groups by row, col mode groups by col
+      const hue = mode===0?['var(--q)','var(--v)','var(--pink)'][r]:['var(--q)','var(--v)','var(--pink)'][c];
+      s+=DB.cell(x0+c*cw,y0+r*rh,cw-3,rh-3,data[r][c],{fill:hue,tcol:'#0b0e14',fs:10});
+    }
+    // highlight what's stored together
+    if(mode===0) s+=`<text x="${W/2}" y="${y0+3*rh+22}" text-anchor="middle" font-size="10.5" font-family="monospace" fill="var(--good)" font-weight="700">한 줄(고객 1명)을 함께 저장 → 한 건 거래에 빠름</text>`;
+    else s+=`<text x="${W/2}" y="${y0+3*rh+22}" text-anchor="middle" font-size="10.5" font-family="monospace" fill="var(--good)" font-weight="700">한 열(나이 전부)을 함께 저장 → '나이 평균'에 빠름</text>`;
+    document.getElementById('s0').innerHTML=DB.svg(W,H,s,mode===0?'행저장':'열저장');
+    document.querySelectorAll('#store button').forEach((b,i)=>{ const on=i===mode; b.classList.toggle('on',on); b.style.background=on?'var(--hot)':'var(--panel-2)'; b.style.color=on?'#0b0e14':'var(--muted)'; });
+    document.getElementById('lab0').innerHTML = mode===0?'<b style="color:var(--hot)">행 저장(OLTP)</b>: 한 줄을 모아 둬 거래 한 건을 빠르게(우리가 본 엔진).':'<b style="color:var(--hot)">열 저장(OLAP)</b>: 한 열을 모아 둬 분석(합계·평균)을 빠르게.';
+  }
+  el.addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b)return; mode=+b.dataset.i; render(); });
+  render();
+})();
+
+// ===== STEP 1: landscape =====
+(function(){ let sel=0;
+  const L=[
+    {k:'NoSQL (문서·키값)',c:'var(--q)',get:'유연한 스키마·수평 확장',give:'조인·강한 트랜잭션 보장은 약함'},
+    {k:'인메모리·캐시',c:'var(--hot)',get:'메모리에 올려 극한 속도',give:'용량 제한·정전 시 휘발(내구성 약함)'},
+    {k:'컬럼스토어 (OLAP)',c:'var(--v)',get:'대량 분석(집계) 초고속',give:'한 건 거래·잦은 수정엔 불리'},
+    {k:'그래프 DB',c:'var(--pink)',get:'관계(친구의 친구) 탐색에 강함',give:'단순 표 작업엔 과함'},
+  ];
+  const el=document.getElementById('land'); el.innerHTML=L.map((l,i)=>`<button data-i="${i}">${l.k}</button>`).join('');
+  function render(){ const W=460,H=140; const l=L[sel]; let s='';
+    s+=`<rect x="16" y="16" width="${W-32}" height="${H-32}" rx="12" fill="var(--panel)" stroke="${l.c}"/>`;
+    s+=`<text x="34" y="46" fill="${l.c}" font-size="14" font-family="monospace" font-weight="700">${l.k}</text>`;
+    s+=`<text x="34" y="76" fill="var(--good)" font-size="11" font-family="monospace">✓ 얻는 것: ${l.get}</text>`;
+    s+=`<text x="34" y="104" fill="var(--drop)" font-size="11" font-family="monospace">✗ 포기: ${l.give}</text>`;
+    document.getElementById('s1').innerHTML=DB.svg(W,H,s,l.k);
+    document.querySelectorAll('#land button').forEach((b,i)=>{ const on=i===sel; b.classList.toggle('on',on); b.style.background=on?L[i].c:'var(--panel-2)'; b.style.color=on?'#0b0e14':'var(--muted)'; });
+    document.getElementById('lab1').innerHTML = `<b style="color:${l.c}">${l.k}</b>: ${l.get} — 대신 ${l.give}.`;
+  }
+  el.addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b)return; sel=+b.dataset.i; render(); });
+  render();
+})();
+
+// ===== STEP 2: back to ledger (map) =====
+(function(){ let sel=-1;
+  const rows=[
+    {cells:['빨리 찾기','인덱스·B+tree'],ch:'PART B (03~06)'},
+    {cells:['똑똑하게 찾기','플래너·통계·조인'],ch:'PART C (07~09)'},
+    {cells:['안전하게 바꾸기','트랜잭션·격리·MVCC'],ch:'PART D (10~13)'},
+    {cells:['견디고 키우기','WAL·복제·샤딩'],ch:'PART E (14~16)'},
+  ];
+  const el=document.getElementById('s2');
+  function render(){ const W=460,H=150; let s='';
+    s+=DB.ledger(40,20,380,['종이 장부의 일','맡는 곳'], rows.map((r,i)=>({cells:r.cells, state: i===sel?'index':''})), {rh:28});
+    document.getElementById('s2').innerHTML=DB.svg(W,H,s,'장부 지도');
+    document.getElementById('lab2').innerHTML = sel<0?'줄을 눌러 어느 PART가 그 일을 맡는지 확인하세요.':`<b style="color:var(--v)">${rows[sel].cells[0]}</b> → ${rows[sel].ch}`;
+  }
+  // make rows clickable via overlay buttons (simpler: click cycles)
+  el.addEventListener('click',()=>{ sel=(sel+1)%rows.length; render(); });
+  render();
+})();
+
+// ===== STEP 3: sister links + close =====
+(function(){
+  document.getElementById('sister').innerHTML=`
+    <a href="index.html"><div class="t" style="color:var(--q)">↺ 이 트랙 다시 보기</div><div class="d">데이터베이스 엔진 — 16챕터 목차로</div></a>
+    <a href="#" onclick="document.querySelector('#stepper button[data-s=&quot;2&quot;]').click();return false"><div class="t" style="color:var(--v)">→ 자매 트랙과 잇기</div><div class="d">FastAPI(쿼리·N+1·풀)·동시성(잠금·경쟁·데드락)·알고리즘(이진탐색·B-tree·해시)의 그 아래가 여기</div></a>`;
+  const W=460,H=120;
+  let s=`<text x="${W/2}" y="30" fill="var(--good)" font-size="13" font-family="monospace" text-anchor="middle" font-weight="700">두 축이 전부</text>`;
+  s+=`<rect x="30" y="46" width="190" height="50" rx="10" fill="var(--panel)" stroke="var(--hot)"/><text x="125" y="68" fill="var(--hot)" font-size="11" font-family="monospace" text-anchor="middle" font-weight="700">빨리·똑똑하게 찾기</text><text x="125" y="86" fill="var(--muted)" font-size="9" font-family="monospace" text-anchor="middle">저장·인덱스·실행 (A~C)</text>`;
+  s+=`<rect x="240" y="46" width="190" height="50" rx="10" fill="var(--panel)" stroke="var(--q)"/><text x="335" y="68" fill="var(--q)" font-size="11" font-family="monospace" text-anchor="middle" font-weight="700">안전하게 바꾸고 견디기</text><text x="335" y="86" fill="var(--muted)" font-size="9" font-family="monospace" text-anchor="middle">트랜잭션·내구·확장 (D~E)</text>`;
+  document.getElementById('s3').innerHTML=DB.svg(W,H,s,'마무리');
+  document.getElementById('lab3').innerHTML='수고했어요 — 이제 데이터베이스가 <b>눈에 보일</b> 거예요. 🟢';
+})();
+</script>
+</body>
+</html>

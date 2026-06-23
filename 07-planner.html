@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>07 · 쿼리 플래너 — 데이터베이스, 눈으로 보기</title>
+<link rel="stylesheet" href="shared/theme.css">
+<link rel="icon" type="image/svg+xml" href="shared/favicon.svg">
+<style>
+  .big{font-family:'JetBrains Mono',monospace; font-size:14px; color:var(--ink); margin:8px 2px 0;}
+  .ctl{display:flex; align-items:center; gap:10px; margin:10px 0; flex-wrap:wrap;}
+  svg{display:block; width:100%;}
+  .toggles{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
+  .toggles button{font-family:'JetBrains Mono',monospace;font-size:12px;padding:7px 12px;border-radius:8px;background:var(--panel-2);border:1px solid var(--line);color:var(--muted);cursor:pointer}
+  .toggles button.on{color:#0b0e14;font-weight:700}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topnav" id="topnav"></div>
+
+  <header>
+    <div class="tag" style="color:var(--v)">PART C · 쿼리 실행 — CH 07</div>
+    <h1>쿼리 플래너</h1>
+    <p class="intro">여기까지 오며 사실 당신은 <b>이미 같은 질문에 대한 두 가지 답</b>을 봤어요 — 풀 스캔(다 읽기)과 인덱스 스캔(콕 집기). "잔액이 880인 행"을 풀 스캔으로도, 인덱스로도 찾을 수 있죠. 보통은 실행 경로가 <b>훨씬 더 많아요</b>(어느 인덱스를 쓸지, 조인을 어떤 순서로 할지…). 그럼 그중 무엇으로 실행할지 <b>누가 정할까요?</b> 바로 <b>쿼리 플래너(옵티마이저)</b>예요. 플래너는 SQL을 받으면 ① 가능한 <b>실행 계획 후보</b>들을 그려보고 ② 각 계획의 <b>비용을 추정</b>하고(읽을 페이지 수 등) ③ <b>가장 싼 계획</b>을 골라 실행해요. 그래서 당신은 "무엇을 원하는지"(SQL)만 말하고, "어떻게 할지"는 플래너가 정해요 — 같은 SQL이라도 데이터 상황에 따라 플래너가 <b>다른 계획</b>을 고를 수 있죠. 이게 선언적 질의의 힘이자, 다음 챕터에서 볼 함정(추정이 틀리면?)의 시작이에요.</p>
+  </header>
+
+  <nav class="stepper" id="stepper">
+    <button data-s="0" class="active">00 · 넌 이미 두 경로를 봤다</button>
+    <button data-s="1">01 · 길 고르기</button>
+    <button data-s="2">02 · 플래너가 하는 일</button>
+    <button data-s="3">03 · 정리</button>
+  </nav>
+
+  <!-- STEP 0 -->
+  <section class="panel show" data-panel="0">
+    <span class="kicker" style="color:var(--hot)">Step 00 — You've Seen Two Paths</span>
+    <h2>같은 질문, 두 가지 실행</h2>
+    <p class="lead">"잔액 = 880인 행"이라는 한 질문에, 이미 두 가지 경로를 배웠어요. <b>풀 스캔</b>: 모든 페이지를 순서대로(비용 = 전체). <b>인덱스 스캔</b>: 정렬된 길잡이로 콕(비용 = 로그 + 약간). 같은 결과, 다른 비용. 플래너는 바로 이 <b>여러 길 중에서 고르는</b> 일을 해요 — 새로운 개념이 아니라, 당신이 PART B까지 손으로 고르던 걸 자동화한 거예요.</p>
+    <div class="scene" id="s0"></div>
+    <p class="big" id="lab0"></p>
+    <p class="note" style="margin-top:6px">→ "여러 실행 경로가 있다"는 이미 본 사실 — 플래너는 그중 싼 걸 고를 뿐이에요.</p>
+  </section>
+
+  <!-- STEP 1 -->
+  <section class="panel" data-panel="1">
+    <span class="kicker" style="color:var(--q)">Step 01 — Pick the Path</span>
+    <h2>당신이 골라보고, 엔진과 비교</h2>
+    <p class="lead">직접 플래너가 돼 보세요. 슬라이더로 <b>조건에 맞는 행 비율</b>을 바꾸고, 두 경로 중 <b>더 싸 보이는 쪽</b>을 눌러요. 그러면 엔진의 정답과 맞춰봐요. 적게 맞으면 인덱스, 많이 맞으면(어차피 다 읽을 거) 풀 스캔이 싸죠(CH02의 그 선택도!). 플래너가 매 질문 이 판단을 비용으로 해요.</p>
+    <div class="ctl"><label>맞는 행 비율 <span id="sL" style="color:var(--hot)">5%</span></label><input type="range" id="sv" min="1" max="100" step="1" value="5" style="flex:1"></div>
+    <div class="toggles" id="pick"></div>
+    <div class="scene" id="s1"></div>
+    <p class="big" id="lab1"></p>
+    <p class="note" style="margin-top:6px">→ 플래너 = "비용 추정 → 최소 선택". 당신이 방금 한 그 판단을 숫자로 자동화한 거예요.</p>
+  </section>
+
+  <!-- STEP 2 -->
+  <section class="panel" data-panel="2">
+    <span class="kicker" style="color:var(--v)">Step 02 — What the Planner Does</span>
+    <h2>후보를 그리고, 비용을 매기고, 고른다</h2>
+    <p class="lead">플래너의 세 단계를 봐요. 조인이 낀 질문은 경로가 더 많아져요 — 어느 테이블을 먼저 읽을지, 어떤 조인 방식을 쓸지. 플래너는 이런 <b>후보 계획들을 트리로</b> 그려보고, 각각에 <b>비용(읽을 페이지 추정)</b>을 매긴 뒤 <b>가장 싼 트리</b>를 골라요. 버튼으로 두 후보 계획과 그 비용을 비교하세요 — 플래너는 초록(싼 쪽)을 실행해요.</p>
+    <div class="toggles" id="cand"></div>
+    <div class="scene" id="s2"></div>
+    <p class="big" id="lab2"></p>
+    <p class="note" style="margin-top:6px">→ 비용 추정이 계획 선택의 전부 — 그래서 추정이 틀리면 나쁜 계획을 골라요(다음 챕터).</p>
+  </section>
+
+  <!-- STEP 3 -->
+  <section class="panel" data-panel="3">
+    <span class="kicker" style="color:var(--good)">Step 03 — Takeaways</span>
+    <h2>정리</h2>
+    <p class="lead"><b>쿼리 플래너</b>는 같은 SQL에 대해 여러 <b>실행 계획 후보</b>를 그려보고, 각각의 <b>비용을 추정</b>해, <b>가장 싼 계획</b>을 골라 실행해요. 당신은 "무엇을"(SQL)만 말하고 "어떻게"는 플래너가 정하죠 — 그래서 같은 SQL도 데이터 상황에 따라 다른 계획이 돼요. 모든 건 <b>비용 추정</b>에 달렸는데, 그 추정의 핵심 입력이 "이 조건에 몇 행이나 맞을까?"예요. 다음엔 그 추정 — 카디널리티 — 과, 그게 틀렸을 때의 재앙을 봐요.</p>
+    <div class="scene" id="s3"></div>
+    <p class="big" id="lab3"></p>
+    <p class="note" style="margin-top:14px">→ 다음 → <a href="08-cardinality.html" style="color:var(--q);font-weight:700">CH 08 · 통계와 카디널리티</a></p>
+  </section>
+
+  <p class="foot">// 코드 없는 직관 입문 · <a href="index.html">목차</a></p>
+</div>
+
+<script src="shared/lib.js"></script>
+<script src="shared/lib-db.js"></script>
+<script>
+VZ.mountTopnav('#topnav', '07 · 쿼리 플래너');
+VZ.setupStepper();
+const DB=VZ.DB, clamp=VZ.clamp;
+
+// ===== STEP 0: two paths =====
+(function(){ const W=460,H=160; let s='';
+  s+=`<text x="${W/2}" y="20" text-anchor="middle" font-size="11" font-family="monospace" fill="var(--muted)">질문: 잔액 = 880 인 행</text>`;
+  s+=DB.box(40,40,170,40,'풀 스캔',{color:'var(--q)',fs:12,sub:'모든 페이지 (비용 100)'});
+  s+=DB.box(250,40,170,40,'인덱스 스캔',{color:'var(--v)',fs:12,sub:'길잡이로 콕 (비용 4)'});
+  s+=`<text x="125" y="104" text-anchor="middle" font-size="20" font-family="monospace" fill="var(--q)">↓</text>`;
+  s+=`<text x="335" y="104" text-anchor="middle" font-size="20" font-family="monospace" fill="var(--v)">↓</text>`;
+  s+=`<text x="${W/2}" y="132" text-anchor="middle" font-size="12" font-family="monospace" fill="var(--good)" font-weight="700">같은 결과 — 다른 비용. 플래너가 둘 중 고른다.</text>`;
+  document.getElementById('s0').innerHTML=DB.svg(W,H,s,'두 경로');
+  document.getElementById('lab0').innerHTML='한 질문에 여러 실행 경로 — 이미 본 사실이에요. 플래너는 그중 싼 걸 자동으로 골라요.';
+})();
+
+// ===== STEP 1: pick the path game =====
+(function(){ let sel=5, guess=null;
+  const sv=document.getElementById('sv'), sL=document.getElementById('sL');
+  const el=document.getElementById('pick'); el.innerHTML=`<button data-i="0">풀 스캔이 싸다</button><button data-i="1">인덱스가 싸다</button>`;
+  function costs(){ const total=100, matched=sel; const scan=total; const idx=Math.round(matched*5+3); return {scan,idx,best: idx<scan?1:0}; }
+  function render(){ const W=460,H=140; const c=costs(); let s='';
+    const items=[{label:'풀 스캔',cost:c.scan,picked:guess===0,best:c.best===0},{label:'인덱스',cost:c.idx,picked:guess===1,best:c.best===1}];
+    s+=DB.costBar(20,18,420,items,{bh:28,gap:16});
+    document.getElementById('s1').innerHTML=DB.svg(W,H,s,'길 고르기');
+    document.querySelectorAll('#pick button').forEach((b,i)=>{ const on=i===guess; b.classList.toggle('on',on); b.style.background=on?'var(--q)':'var(--panel-2)'; b.style.color=on?'#0b0e14':'var(--muted)'; });
+    if(guess==null) document.getElementById('lab1').innerHTML='맞는 행 비율을 정하고, 더 싼 경로를 골라보세요.';
+    else { const right=guess===c.best; document.getElementById('lab1').innerHTML = right?`<b style="color:var(--good)">정답!</b> ${sel}%에선 ${c.best===1?'인덱스':'풀 스캔'}이 싸요(${c.best===1?c.idx:c.scan} vs ${c.best===1?c.scan:c.idx}). 플래너와 같은 선택.`:`<b style="color:var(--drop)">엔진 생각은 달라요.</b> ${sel}%에선 ${c.best===1?'인덱스':'풀 스캔'}이 더 싸요(${c.best===1?c.idx:c.scan} vs ${c.best===1?c.scan:c.idx}).`; }
+  }
+  sv.oninput=()=>{ sel=+sv.value; sL.textContent=sel+'%'; render(); };
+  el.addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b)return; guess=+b.dataset.i; render(); });
+  render();
+})();
+
+// ===== STEP 2: candidate plans =====
+(function(){ let mode=0;
+  const el=document.getElementById('cand'); el.innerHTML=`<button data-i="0">후보 A</button><button data-i="1">후보 B</button>`;
+  // join of 주문 x 고객, two plans
+  function plan(mode){ if(mode===0){ // seq scan both + hash join, cost high
+      return {label:'Hash Join',sub:'주문⨝고객',cost:140,state:'active',children:[
+        {label:'Seq Scan',sub:'주문(전체)',cost:100,state:'bad'},
+        {label:'Seq Scan',sub:'고객(전체)',cost:40,state:'bad'},
+      ]};
+    } else { // index on 고객 + nested loop, cost low
+      return {label:'Nested Loop',sub:'주문⨝고객',cost:34,state:'ok',children:[
+        {label:'Index Scan',sub:'주문(좁힘)',cost:12,state:'ok'},
+        {label:'Index Scan',sub:'고객(키 매칭)',cost:8,state:'ok'},
+      ]};
+    }
+  }
+  function render(){ const W=460,H=200; const p=plan(mode); let s=DB.planTree(W,H,p,{bw:104,bh:38});
+    document.getElementById('s2').innerHTML=DB.svg(W,H,s,'후보 계획');
+    document.querySelectorAll('#cand button').forEach((b,i)=>{ const on=i===mode; b.classList.toggle('on',on); b.style.background=on?(i===0?'var(--drop)':'var(--good)'):'var(--panel-2)'; b.style.color=on?'#0b0e14':'var(--muted)'; });
+    document.getElementById('lab2').innerHTML = mode===0?'<b style="color:var(--drop)">후보 A</b>: 양쪽 풀스캔 + Hash Join — 추정 비용 <b>140</b>.':'<b style="color:var(--good)">후보 B</b>: 인덱스 + Nested Loop — 추정 비용 <b>34</b>. 플래너는 이걸 골라요.';
+  }
+  el.addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b)return; mode=+b.dataset.i; render(); });
+  render();
+})();
+
+// ===== STEP 3 =====
+(function(){ const W=460,H=110;
+  let s=`<text x="${W/2}" y="26" fill="var(--v)" font-size="12.5" font-family="monospace" text-anchor="middle" font-weight="700">후보 그리기 → 비용 추정 → 최소 선택</text>`;
+  const rows=[['선언적','"무엇을"만 말하면 "어떻게"는 플래너가','var(--good)'],['비용 추정','계획 선택은 전부 추정에 달림 → 다음 챕터','var(--hot)']];
+  rows.forEach((r,i)=>{ const y=42+i*30; s+=`<rect x="20" y="${y}" width="${W-40}" height="25" rx="6" fill="var(--panel)" stroke="${r[2]}" stroke-width="1.1"/><text x="34" y="${y+16.5}" fill="${r[2]}" font-size="11" font-family="monospace" font-weight="700">${r[0]}</text><text x="${W-34}" y="${y+16.5}" fill="var(--ink)" font-size="9.5" font-family="monospace" text-anchor="end">${r[1]}</text>`; });
+  document.getElementById('s3').innerHTML=DB.svg(W,H,s,'정리');
+  document.getElementById('lab3').innerHTML='비용 추정의 핵심 입력 — "몇 행이나 맞을까?" = <b style="color:var(--q)">카디널리티</b>.';
+})();
+</script>
+</body>
+</html>
