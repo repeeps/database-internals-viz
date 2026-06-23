@@ -101,7 +101,7 @@ const DB=VZ.DB, clamp=VZ.clamp;
 (function(){ let sel=5, guess=null;
   const sv=document.getElementById('sv'), sL=document.getElementById('sL');
   const el=document.getElementById('pick'); el.innerHTML=`<button data-i="0">풀 스캔이 싸다</button><button data-i="1">인덱스가 싸다</button>`;
-  function costs(){ const total=100, matched=sel; const scan=total; const idx=Math.round(matched*5+3); return {scan,idx,best: idx<scan?1:0}; }
+  function costs(){ const total=100, matched=sel; const scan=total; const idx=Math.min(Math.round(matched*5+3), scan*3); return {scan,idx,best: idx<scan?1:0}; }
   function render(){ const W=460,H=140; const c=costs(); let s='';
     const items=[{label:'풀 스캔',cost:c.scan,picked:guess===0,best:c.best===0},{label:'인덱스',cost:c.idx,picked:guess===1,best:c.best===1}];
     s+=DB.costBar(20,18,420,items,{bh:28,gap:16});

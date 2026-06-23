@@ -51,7 +51,7 @@
     <div class="ctl"><label>테이블 페이지 수 <span id="pL" style="color:var(--hot)">40</span></label><input type="range" id="pv" min="10" max="200" step="10" value="40" style="flex:1"></div>
     <div class="scene" id="s1"></div>
     <p class="big" id="lab1"></p>
-    <p class="note" style="margin-top:6px">→ 풀 스캔 = 선형(O(n)). 인덱스 = 로그(O(log n)). 이 격차가 PART B의 전부예요.</p>
+    <p class="note" style="margin-top:6px">→ 풀 스캔 = 선형(행 수에 비례, 수학기호로 O(n)). 인덱스 = 로그(거의 평평, O(log n)). 이 격차가 PART B의 전부예요.</p>
   </section>
 
   <!-- STEP 2 -->
@@ -123,7 +123,7 @@ const DB=VZ.DB, clamp=VZ.clamp;
   function render(){ const W=460,H=150; const total=100;
     const matched=total*sel/100;
     const scanCost=total; // always read all pages (sequential, cheap per page)
-    const idxCost=Math.round(matched*5 + 3); // index: scattered random lookup per matched row (~5x penalty) → 역전 ~20%
+    const idxCost=Math.min(Math.round(matched*5 + 3), scanCost*3); // 맞는 행마다 흩어진 조회(~5x) → 역전 ~20%, 단 최악도 풀스캔 ~3배 안쪽(상한)
     const scanWins=scanCost<idxCost;
     const items=[{label:'풀 스캔(순차)',cost:scanCost,picked:scanWins,best:scanWins},{label:'인덱스(랜덤조회)',cost:idxCost,picked:!scanWins,best:!scanWins}];
     let s=DB.costBar(20,24,420,items,{bh:30,gap:18});

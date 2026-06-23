@@ -121,7 +121,7 @@ const DB=VZ.DB, clamp=VZ.clamp;
     s+=`<text x="${20+st.mid*cw+cw/2}" y="40" text-anchor="middle" font-size="9" font-family="monospace" fill="var(--hot)">중간</text>`;
     s+=`<text x="${W/2}" y="100" fill="var(--muted)" font-size="10" font-family="monospace" text-anchor="middle">37 찾기 · 회색=버린 범위</text>`;
     document.getElementById('s1').innerHTML=DB.svg(W,H,s,'이진탐색');
-    document.getElementById('lab1').innerHTML = st.found?`<b style="color:var(--good)">찾음!</b> 16개를 ${rec.frames.indexOf(fr)+1}번 만에 — 풀 스캔이면 7번째라 7번 읽을 걸, 절반씩 줄여 빠르게.`:'가운데를 보고 절반을 버리는 중…';
+    document.getElementById('lab1').innerHTML = st.found?`<b style="color:var(--good)">찾음!</b> 매번 절반을 버려서 ${rec.frames.indexOf(fr)+1}번에 — 16개면 별 차이 없어 보여도, <b>1024개는 10번, 100만 개는 20번</b>이면 끝나요.`:'가운데를 보고 절반을 버리는 중…';
   }
   VZ.AL.transport('#bs-ctl', rec.frames, render, {interval:900});
 })();
