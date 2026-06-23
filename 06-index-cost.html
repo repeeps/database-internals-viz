@@ -22,7 +22,7 @@
   <header>
     <div class="tag" style="color:var(--hot)">PART B · 인덱스 — CH 06</div>
     <h1>인덱스의 비용 · 모양</h1>
-    <p class="intro">인덱스는 읽기를 극적으로 빠르게 하지만 <b>공짜가 아니에요</b>. 인덱스는 "정렬된 사본"이라, 행을 <b>넣거나 고칠 때마다 인덱스도 같이 갱신</b>해 정렬을 유지해야 해요 — 인덱스가 많을수록 <b>쓰기가 느려지고</b> 디스크 공간도 더 써요. 게다가 모든 인덱스가 쓸모 있는 것도 아니에요: <b>카디널리티</b>(값의 다양함)가 낮은 열 — 예컨대 '성별'(값이 둘뿐) — 에 인덱스를 걸면, 인덱스를 타도 절반을 읽어야 해 풀스캔과 별 차이가 없어요. 마지막으로 인덱스에도 <b>모양</b>이 있어요: 인덱스가 행을 <b>가리키기만</b> 하는지(secondary — 찾은 뒤 본체로 한 번 더 점프), 인덱스가 <b>곧 행 자체</b>인지(clustered — 추가 점프 없음). 그리고 질문에 필요한 열이 <b>인덱스 안에 다 들어 있으면</b>(커버링 인덱스) 본체에 갈 필요조차 없어요. "인덱스를 건다"는 늘 <b>읽기 이득 ↔ 쓰기·공간 비용</b>의 저울질이에요.</p>
+    <p class="intro">인덱스는 읽기를 극적으로 빠르게 하지만 <b>공짜가 아니에요</b>. 인덱스는 "정렬된 사본"이라, 행을 <b>넣거나 고칠 때마다 인덱스도 같이 갱신</b>해 정렬을 유지해야 해요 — 인덱스가 많을수록 <b>쓰기가 느려지고</b> 디스크 공간도 더 써요. 게다가 모든 인덱스가 쓸모 있는 것도 아니에요: <b>카디널리티</b>(값의 다양함)가 낮은 열 — 예컨대 '성별'(값이 둘뿐) — 에 인덱스를 걸면, 인덱스를 타도 절반을 읽어야 해 풀 스캔과 별 차이가 없어요. 마지막으로 인덱스에도 <b>모양</b>이 있어요: 인덱스가 행을 <b>가리키기만</b> 하는지(secondary — 찾은 뒤 본체로 한 번 더 점프), 인덱스가 <b>곧 행 자체</b>인지(clustered — 추가 점프 없음). 그리고 질문에 필요한 열이 <b>인덱스 안에 다 들어 있으면</b>(커버링 인덱스) 본체에 갈 필요조차 없어요. "인덱스를 건다"는 늘 <b>읽기 이득 ↔ 쓰기·공간 비용</b>의 저울질이에요.</p>
   </header>
 
   <nav class="stepper" id="stepper">
@@ -47,7 +47,7 @@
   <section class="panel" data-panel="1">
     <span class="kicker" style="color:var(--q)">Step 01 — Cardinality</span>
     <h2>값이 다양해야 쓸모 있다</h2>
-    <p class="lead">인덱스로 좁혀지는 정도는 열의 <b>카디널리티</b>(서로 다른 값의 수)에 달렸어요. 버튼으로 비교하세요. <b>이메일</b>(거의 다 고유, 높은 카디널리티): 한 값으로 검색하면 딱 1행으로 좁혀져 인덱스가 압승. <b>성별</b>(값이 둘뿐, 낮은 카디널리티): '여성'으로 검색해도 <b>절반</b>이 맞아 — 인덱스를 타도 절반을 흩어진 채 읽어야 하니 풀스캔만 못해요. 낮은 카디널리티 열의 인덱스는 흔한 헛수고예요.</p>
+    <p class="lead">인덱스로 좁혀지는 정도는 열의 <b>카디널리티</b>(서로 다른 값의 수)에 달렸어요. 버튼으로 비교하세요. <b>이메일</b>(거의 다 고유, 높은 카디널리티): 한 값으로 검색하면 딱 1행으로 좁혀져 인덱스가 압승. <b>성별</b>(값이 둘뿐, 낮은 카디널리티): '여성'으로 검색해도 <b>절반</b>이 맞아 — 인덱스를 타도 절반을 흩어진 채 읽어야 하니 풀 스캔만 못해요. 낮은 카디널리티 열의 인덱스는 흔한 헛수고예요.</p>
     <div class="toggles" id="card"></div>
     <div class="scene" id="s1"></div>
     <p class="big" id="lab1"></p>
@@ -69,7 +69,7 @@
   <section class="panel" data-panel="3">
     <span class="kicker" style="color:var(--good)">Step 03 — Takeaways</span>
     <h2>정리 — PART B를 닫으며</h2>
-    <p class="lead">인덱스는 <b>읽기 이득 ↔ 쓰기·공간 비용</b>의 저울질이에요. 쓰기는 인덱스 수만큼 무거워지고, <b>카디널리티가 낮은</b> 열의 인덱스는 헛수고예요. 인덱스의 <b>모양</b>(secondary는 본체 재방문, clustered는 곧 행, covering은 본체 불필요)도 성능을 가르고요. 그래서 "어떤 열에, 어떤 순서로, 몇 개나" 인덱스를 둘지가 설계의 기술이에요. 이제 — 같은 질문에 인덱스를 쓸지 풀스캔할지, 누가 정하죠? 다음 PART의 주인공, 쿼리 플래너예요.</p>
+    <p class="lead">인덱스는 <b>읽기 이득 ↔ 쓰기·공간 비용</b>의 저울질이에요. 쓰기는 인덱스 수만큼 무거워지고, <b>카디널리티가 낮은</b> 열의 인덱스는 헛수고예요. 인덱스의 <b>모양</b>(secondary는 본체 재방문, clustered는 곧 행, covering은 본체 불필요)도 성능을 가르고요. 그래서 "어떤 열에, 어떤 순서로, 몇 개나" 인덱스를 둘지가 설계의 기술이에요. 이제 — 같은 질문에 인덱스를 쓸지 풀 스캔할지, 누가 정하죠? 다음 PART의 주인공, 쿼리 플래너예요.</p>
     <div class="scene" id="s3"></div>
     <p class="big" id="lab3"></p>
     <p class="note" style="margin-top:14px">→ 다음 → <a href="07-planner.html" style="color:var(--q);font-weight:700">CH 07 · 쿼리 플래너</a></p>
@@ -97,7 +97,7 @@ const DB=VZ.DB, clamp=VZ.clamp;
     for(let i=0;i<k;i++){ const x=150+i*48; s+=DB.box(x,80,42,34,'idx'+(i+1),{color:'var(--hot)',fs:9}); s+=DB.edge(W/2,50,x+21,80,{color:'var(--hot)',lw:1.2}); }
     s+=`<text x="${W/2}" y="138" fill="${k>=4?'var(--drop)':'var(--ink)'}" font-size="12.5" font-family="monospace" text-anchor="middle" font-weight="700">한 번의 INSERT = ${total}번의 쓰기 (본체 1 + 인덱스 ${k})</text>`;
     document.getElementById('s0').innerHTML=DB.svg(W,H,s,'쓰기비용');
-    document.getElementById('lab0').innerHTML = k===0?'인덱스 0개: 본체에만 1번 쓰기 — 쓰기는 빠르지만 검색은 풀스캔뿐.':`인덱스 ${k}개: INSERT마다 <b style="color:${k>=4?'var(--drop)':'var(--hot)'}">${total}번</b> 써요. 읽기 이득의 대가예요.`;
+    document.getElementById('lab0').innerHTML = k===0?'인덱스 0개: 본체에만 1번 쓰기 — 쓰기는 빠르지만 검색은 풀 스캔뿐.':`인덱스 ${k}개: INSERT마다 <b style="color:${k>=4?'var(--drop)':'var(--hot)'}">${total}번</b> 써요. 읽기 이득의 대가예요.`;
   }
   render();
 })();
@@ -156,7 +156,7 @@ const DB=VZ.DB, clamp=VZ.clamp;
   const rows=[['쓰기 대가','인덱스 수만큼 INSERT가 무거워짐','var(--hot)'],['카디널리티','값이 다양해야 좁혀짐(성별=헛수고)','var(--drop)'],['모양','secondary 재방문 / clustered / covering','var(--v)']];
   rows.forEach((r,i)=>{ const y=40+i*28; s+=`<rect x="20" y="${y}" width="${W-40}" height="23" rx="6" fill="var(--panel)" stroke="${r[2]}" stroke-width="1.1"/><text x="34" y="${y+15.5}" fill="${r[2]}" font-size="11" font-family="monospace" font-weight="700">${r[0]}</text><text x="${W-34}" y="${y+15.5}" fill="var(--ink)" font-size="9" font-family="monospace" text-anchor="end">${r[1]}</text>`; });
   document.getElementById('s3').innerHTML=DB.svg(W,H,s,'정리');
-  document.getElementById('lab3').innerHTML='인덱스를 쓸지 풀스캔할지 — 누가 정할까? <b style="color:var(--q)">쿼리 플래너</b>.';
+  document.getElementById('lab3').innerHTML='인덱스를 쓸지 풀 스캔할지 — 누가 정할까? <b style="color:var(--q)">쿼리 플래너</b>.';
 })();
 </script>
 </body>

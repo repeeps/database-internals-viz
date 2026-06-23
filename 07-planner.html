@@ -134,7 +134,7 @@ const DB=VZ.DB, clamp=VZ.clamp;
   function render(){ const W=460,H=200; const p=plan(mode); let s=DB.planTree(W,H,p,{bw:104,bh:38});
     document.getElementById('s2').innerHTML=DB.svg(W,H,s,'후보 계획');
     document.querySelectorAll('#cand button').forEach((b,i)=>{ const on=i===mode; b.classList.toggle('on',on); b.style.background=on?(i===0?'var(--drop)':'var(--good)'):'var(--panel-2)'; b.style.color=on?'#0b0e14':'var(--muted)'; });
-    document.getElementById('lab2').innerHTML = mode===0?'<b style="color:var(--drop)">후보 A</b>: 양쪽 풀스캔 + Hash Join — 추정 비용 <b>140</b>.':'<b style="color:var(--good)">후보 B</b>: 인덱스 + Nested Loop — 추정 비용 <b>34</b>. 플래너는 이걸 골라요.';
+    document.getElementById('lab2').innerHTML = mode===0?'<b style="color:var(--drop)">후보 A</b>: 양쪽 풀 스캔 + Hash Join — 추정 비용 <b>140</b>.':'<b style="color:var(--good)">후보 B</b>: 인덱스 + Nested Loop — 추정 비용 <b>34</b>. 플래너는 이걸 골라요.';
   }
   el.addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b)return; mode=+b.dataset.i; render(); });
   render();

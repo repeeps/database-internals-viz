@@ -28,7 +28,7 @@
   <nav class="stepper" id="stepper">
     <button data-s="0" class="active">00 · 처음부터 끝까지</button>
     <button data-s="1">01 · 비용의 기준점</button>
-    <button data-s="2">02 · 풀스캔이 이길 때</button>
+    <button data-s="2">02 · 풀 스캔이 이길 때</button>
     <button data-s="3">03 · 정리</button>
   </nav>
 
@@ -40,7 +40,7 @@
     <div class="ctl"><button class="btn play" id="go0">▶ 풀 스캔</button></div>
     <div class="scene" id="s0"></div>
     <p class="big" id="lab0"></p>
-    <p class="note" style="margin-top:6px">→ "어디 있는지 모른다"가 풀스캔의 본질 — 다 읽어봐야 알아요. 인덱스는 이걸 없애요.</p>
+    <p class="note" style="margin-top:6px">→ "어디 있는지 모른다"가 풀 스캔의 본질 — 다 읽어봐야 알아요. 인덱스는 이걸 없애요.</p>
   </section>
 
   <!-- STEP 1 -->
@@ -62,7 +62,7 @@
     <div class="ctl"><label>맞는 행 비율 <span id="sL" style="color:var(--hot)">5%</span></label><input type="range" id="sv" min="1" max="100" step="1" value="5" style="flex:1"></div>
     <div class="scene" id="s2"></div>
     <p class="big" id="lab2"></p>
-    <p class="note" style="margin-top:6px">→ 이 "선택도(selectivity)"가 PART C에서 플래너가 풀스캔/인덱스를 고르는 핵심 잣대예요.</p>
+    <p class="note" style="margin-top:6px">→ 이 "선택도(selectivity)"가 PART C에서 플래너가 풀 스캔/인덱스를 고르는 핵심 잣대예요.</p>
   </section>
 
   <!-- STEP 3 -->
@@ -96,7 +96,7 @@ const DB=VZ.DB, clamp=VZ.clamp;
     }
     s+=`<text x="${W/2}" y="32" fill="var(--muted)" font-size="10" font-family="monospace" text-anchor="middle">잔액=880 인 행 찾기 (어디 있는지 모름)</text>`;
     s+=`<text x="${W/2}" y="118" fill="${upto>=targetPage?'var(--good)':'var(--hot)'}" font-size="11.5" font-family="monospace" text-anchor="middle" font-weight="700">읽은 페이지 ${Math.min(upto+1,N)} / ${N}</text>`;
-    document.getElementById('s0').innerHTML=DB.svg(W,H,s,'풀스캔');
+    document.getElementById('s0').innerHTML=DB.svg(W,H,s,'풀 스캔');
     document.getElementById('lab0').innerHTML = p<1?'한 페이지씩 읽는 중…':`<b style="color:var(--good)">P${targetPage}</b>에서 찾았지만, 그 전 ${targetPage}장을 다 읽어야 했어요 — 비용 = 페이지 수.`;
   }
   document.getElementById('go0').onclick=()=>{ if(cancel)cancel(); cancel=VZ.LA.tween(p=>frame(p),2600,()=>frame(1)); };
@@ -110,7 +110,7 @@ const DB=VZ.DB, clamp=VZ.clamp;
     const scanCost=pages; const idxCost=Math.max(1, Math.ceil(Math.log2(pages))+2); // log-ish
     const items=[{label:'풀 스캔(기준선)',cost:scanCost},{label:'인덱스(예고)',cost:idxCost,picked:true,best:true}];
     let s=DB.costBar(20,24,420,items,{bh:30,gap:18});
-    s+=`<text x="${W/2}" y="120" fill="var(--muted)" font-size="10" font-family="monospace" text-anchor="middle">페이지 ${pages}장 → 풀스캔 비용 ${scanCost}, 인덱스 ≈ ${idxCost}</text>`;
+    s+=`<text x="${W/2}" y="120" fill="var(--muted)" font-size="10" font-family="monospace" text-anchor="middle">페이지 ${pages}장 → 풀 스캔 비용 ${scanCost}, 인덱스 ≈ ${idxCost}</text>`;
     document.getElementById('s1').innerHTML=DB.svg(W,H,s,'비용 기준선');
     document.getElementById('lab1').innerHTML = `풀 스캔 <b style="color:var(--hot)">${scanCost}</b> vs 인덱스 <b style="color:var(--good)">≈${idxCost}</b> — 테이블이 커질수록 격차가 폭발해요(선형 vs 로그).`;
   }
@@ -137,7 +137,7 @@ const DB=VZ.DB, clamp=VZ.clamp;
 // ===== STEP 3 =====
 (function(){ const W=460,H=110;
   let s=`<text x="${W/2}" y="26" fill="var(--q)" font-size="12.5" font-family="monospace" text-anchor="middle" font-weight="700">풀 스캔 = 선형 기준선 (페이지 수에 비례)</text>`;
-  const rows=[['소수 행 찾기','풀스캔 처참 → 인덱스가 메움 (PART B)','var(--hot)'],['대부분 행 읽기','순차 풀스캔이 외려 이김 (선택도)','var(--good)']];
+  const rows=[['소수 행 찾기','풀 스캔 처참 → 인덱스가 메움 (PART B)','var(--hot)'],['대부분 행 읽기','순차 풀 스캔이 외려 이김 (선택도)','var(--good)']];
   rows.forEach((r,i)=>{ const y=42+i*30; s+=`<rect x="20" y="${y}" width="${W-40}" height="25" rx="6" fill="var(--panel)" stroke="${r[2]}" stroke-width="1.1"/><text x="34" y="${y+16.5}" fill="${r[2]}" font-size="11" font-family="monospace" font-weight="700">${r[0]}</text><text x="${W-34}" y="${y+16.5}" fill="var(--ink)" font-size="9.5" font-family="monospace" text-anchor="end">${r[1]}</text>`; });
   document.getElementById('s3').innerHTML=DB.svg(W,H,s,'정리');
   document.getElementById('lab3').innerHTML='이제 "정렬"이라는 한 아이디어로 선형 기준선을 <b style="color:var(--q)">로그</b>로 끌어내려요.';

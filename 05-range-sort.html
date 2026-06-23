@@ -36,7 +36,7 @@
   <section class="panel show" data-panel="0">
     <span class="kicker" style="color:var(--hot)">Step 00 — Range Scan</span>
     <h2>시작점 하나 찾고, 옆으로 죽</h2>
-    <p class="lead">"키가 <b>30 이상 60 이하</b>인 행"을 찾아요. ▶로 보세요 — 먼저 트리를 타고 내려가 시작값(30)이 든 리프를 찾고(딱 한 번의 트리 탐색), 그다음은 <b>연결된 리프를 옆으로 따라가며</b> 60을 넘을 때까지 줄줄 읽어요. 풀스캔처럼 전부 보지 않고, 필요한 구간만 정확히 훑죠. 굵게 표시된 리프가 읽은 범위예요.</p>
+    <p class="lead">"키가 <b>30 이상 60 이하</b>인 행"을 찾아요. ▶로 보세요 — 먼저 트리를 타고 내려가 시작값(30)이 든 리프를 찾고(딱 한 번의 트리 탐색), 그다음은 <b>연결된 리프를 옆으로 따라가며</b> 60을 넘을 때까지 줄줄 읽어요. 풀 스캔처럼 전부 보지 않고, 필요한 구간만 정확히 훑죠. 굵게 표시된 리프가 읽은 범위예요.</p>
     <div class="ctl" id="rg-ctl"></div>
     <div class="scene" id="s0"></div>
     <p class="big" id="lab0"></p>
@@ -105,7 +105,7 @@ const DB=VZ.DB, clamp=VZ.clamp;
     s+=`<text x="${W/2}" y="${H-4}" text-anchor="middle" font-size="9.5" font-family="monospace" fill="var(--muted)">30 이상 60 이하 · 굵은 리프=전부 읽음, 강조 칸=마지막 읽은 값(70에서 멈춤)</text>`;
     document.getElementById('s0').innerHTML=DB.svg(W,H,s,'범위검색');
     const last=rec.frames.indexOf(fr)===rec.frames.length-1;
-    document.getElementById('lab0').innerHTML = last?'<b style="color:var(--good)">30·40·50·60</b> 읽음 — 트리 탐색 1번 + 리프 2칸. 풀스캔처럼 전부 안 봐요.':'시작점을 찾고 옆으로 따라가는 중…';
+    document.getElementById('lab0').innerHTML = last?'<b style="color:var(--good)">30·40·50·60</b> 읽음 — 트리 탐색 1번 + 리프 2칸. 풀 스캔처럼 전부 안 봐요.':'시작점을 찾고 옆으로 따라가는 중…';
   }
   VZ.AL.transport('#rg-ctl', rec.frames, render, {interval:1100});
 })();
@@ -150,7 +150,7 @@ const DB=VZ.DB, clamp=VZ.clamp;
       else hit = e[1]==='철'; // 이름만 — 흩어짐
       s+=DB.cell(x0+i*(cw+4),y,cw,30,`${e[0]}·${e[1]}`,{fill:hit?(cur.ok?'var(--good)':'var(--drop)'):'var(--panel)',tcol:hit?'#0b0e14':'var(--ink)',fs:10.5,bold:hit}); });
     if(cur.ok) s+=`<text x="${W/2}" y="98" fill="var(--good)" font-size="11" font-family="monospace" text-anchor="middle" font-weight="700">✓ 연속 구간에 모여 있어 인덱스로 바로 점프</text>`;
-    else s+=`<text x="${W/2}" y="98" fill="var(--drop)" font-size="11" font-family="monospace" text-anchor="middle" font-weight="700">✗ 여기저기 흩어져 인덱스 무용 → 풀스캔</text>`;
+    else s+=`<text x="${W/2}" y="98" fill="var(--drop)" font-size="11" font-family="monospace" text-anchor="middle" font-weight="700">✗ 여기저기 흩어져 인덱스 무용 → 풀 스캔</text>`;
     s+=`<text x="${W/2}" y="124" fill="var(--muted)" font-size="10" font-family="monospace" text-anchor="middle">${cur.why}</text>`;
     document.getElementById('s2').innerHTML=DB.svg(W,H,s,'복합인덱스');
     document.querySelectorAll('#cmp button').forEach((b,i)=>{ const on=i===q; b.classList.toggle('on',on); b.style.background=on?(QS[i].ok?'var(--good)':'var(--drop)'):'var(--panel-2)'; b.style.color=on?'#0b0e14':'var(--muted)'; });

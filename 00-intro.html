@@ -95,7 +95,7 @@ const DB=VZ.DB, clamp=VZ.clamp;
   function frame(p){ const t=tgt(); const scanTo=Math.min(n-1, Math.round(p*t)); // stop at target
     const W=460,H=44+ (Math.min(n,16))*22 + 8; let s='';
     s+=DB.ledger(20,16,420,['이름','잔액','스캔'], rowsAt(scanTo));
-    document.getElementById('s0').innerHTML=DB.svg(W,Math.min(H,400),s,'풀스캔');
+    document.getElementById('s0').innerHTML=DB.svg(W,Math.min(H,400),s,'풀 스캔');
     const done = scanTo>=t;
     document.getElementById('lab0').innerHTML = done?`찾음 — <b style="color:var(--good)">${t+1}번째 줄</b>에서 '${NAMES[t]}' 발견. 그 전까지 ${t}줄을 헛읽었어요.`:`위에서부터 한 줄씩 훑는 중… (${scanTo+1}/${n})`;
   }
@@ -147,7 +147,7 @@ const DB=VZ.DB, clamp=VZ.clamp;
 
 // ===== STEP 3: course map =====
 (function(){ const PARTS=[
-    ['A · 저장과 읽기','디스크·페이지·풀스캔 — 데이터가 어떻게 놓이나','var(--q)'],
+    ['A · 저장과 읽기','디스크·페이지·풀 스캔 — 데이터가 어떻게 놓이나','var(--q)'],
     ['B · 인덱스 ★','정렬·B+tree·범위·비용 — 빨리 찾기','var(--hot)'],
     ['C · 쿼리 실행','플래너·카디널리티·조인 — 똑똑하게 고르기','var(--v)'],
     ['D · 트랜잭션·동시성 ★','ACID·이상현상·락·MVCC — 안전하게 바꾸기','var(--hot)'],

@@ -63,7 +63,7 @@
   <section class="panel" data-panel="2">
     <span class="kicker" style="color:var(--v)">Step 02 — Back to the Ledger</span>
     <h2>이제 장부 안이 다 보인다</h2>
-    <p class="lead">0번의 종이 장부로 돌아왔어요. 그땐 "찾기 느림 + 동시 수정 깨짐"이라는 두 문제만 보였죠. 이제 그 단순한 표 안에서 벌어지는 일이 보일 거예요 — 줄을 눌러 어느 챕터가 그 일을 맡는지 확인하세요. 한 잣대로 요약하면: <b>"빨리·똑똑하게 찾기"(A~C)</b>와 <b>"안전하게 바꾸고 견디기"(D~E)</b>. 이 두 축이 데이터베이스의 전부예요.</p>
+    <p class="lead">0번의 종이 장부로 돌아왔어요. 그땐 "찾기 느림 + 동시 수정 깨짐"이라는 두 문제만 보였죠. 이제 그 단순한 표 안에서 벌어지는 일이 보일 거예요 — 표를 누를 때마다 한 줄씩 짚어가며 어느 PART가 그 일을 맡는지 확인하세요. 한 잣대로 요약하면: <b>"빨리·똑똑하게 찾기"(A~C)</b>와 <b>"안전하게 바꾸고 견디기"(D~E)</b>. 이 두 축이 데이터베이스의 전부예요.</p>
     <div class="scene" id="s2"></div>
     <p class="big" id="lab2"></p>
     <p class="note" style="margin-top:6px">→ 수미상관: 종이 장부의 두 고민이 16챕터의 두 기둥(인덱스 · 트랜잭션)으로 풀렸어요.</p>
@@ -149,7 +149,7 @@ const DB=VZ.DB;
   function render(){ const W=460,H=150; let s='';
     s+=DB.ledger(40,20,380,['종이 장부의 일','맡는 곳'], rows.map((r,i)=>({cells:r.cells, state: i===sel?'index':''})), {rh:28});
     document.getElementById('s2').innerHTML=DB.svg(W,H,s,'장부 지도');
-    document.getElementById('lab2').innerHTML = sel<0?'줄을 눌러 어느 PART가 그 일을 맡는지 확인하세요.':`<b style="color:var(--v)">${rows[sel].cells[0]}</b> → ${rows[sel].ch}`;
+    document.getElementById('lab2').innerHTML = sel<0?'표를 누를 때마다 한 줄씩 짚어가며 확인하세요.':`<b style="color:var(--v)">${rows[sel].cells[0]}</b> → ${rows[sel].ch}`;
   }
   // make rows clickable via overlay buttons (simpler: click cycles)
   el.addEventListener('click',()=>{ sel=(sel+1)%rows.length; render(); });

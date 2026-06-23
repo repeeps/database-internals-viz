@@ -51,7 +51,7 @@
     <div class="ctl" id="bs-ctl"></div>
     <div class="scene" id="s1"></div>
     <p class="big" id="lab1"></p>
-    <p class="note" style="margin-top:6px">→ 풀스캔 O(n)이 이진탐색 O(log n)으로 — 100만→20. 이게 인덱스가 주는 마법이에요.</p>
+    <p class="note" style="margin-top:6px">→ 풀 스캔 O(n)이 이진탐색 O(log n)으로 — 100만→20. 이게 인덱스가 주는 마법이에요.</p>
   </section>
 
   <!-- STEP 2 -->
@@ -68,7 +68,7 @@
   <section class="panel" data-panel="3">
     <span class="kicker" style="color:var(--good)">Step 03 — Takeaways</span>
     <h2>정리</h2>
-    <p class="lead"><b>정렬</b>은 "중간만 봐도 방향을 안다"를 가능케 해, 풀스캔(다 보기)을 <b>이진 탐색</b>(반씩 줄이기)으로 바꿔요 — O(n)에서 O(log n)으로. 하지만 원본 테이블은 정렬돼 있지 않으니, 엔진은 <b>정렬된 키 + 포인터</b>만 담은 별도 길잡이 = <b>인덱스</b>를 둬요. 다음엔 이 정렬된 길잡이를 <b>디스크에 맞게</b> 만든 실제 자료구조 — B+tree — 를 봐요.</p>
+    <p class="lead"><b>정렬</b>은 "중간만 봐도 방향을 안다"를 가능케 해, 풀 스캔(다 보기)을 <b>이진 탐색</b>(반씩 줄이기)으로 바꿔요 — O(n)에서 O(log n)으로. 하지만 원본 테이블은 정렬돼 있지 않으니, 엔진은 <b>정렬된 키 + 포인터</b>만 담은 별도 길잡이 = <b>인덱스</b>를 둬요. 다음엔 이 정렬된 길잡이를 <b>디스크에 맞게</b> 만든 실제 자료구조 — B+tree — 를 봐요.</p>
     <div class="scene" id="s3"></div>
     <p class="big" id="lab3"></p>
     <p class="note" style="margin-top:14px">→ 다음 → <a href="04-btree.html" style="color:var(--q);font-weight:700">CH 04 · B+tree</a></p>
@@ -121,7 +121,7 @@ const DB=VZ.DB, clamp=VZ.clamp;
     s+=`<text x="${20+st.mid*cw+cw/2}" y="40" text-anchor="middle" font-size="9" font-family="monospace" fill="var(--hot)">중간</text>`;
     s+=`<text x="${W/2}" y="100" fill="var(--muted)" font-size="10" font-family="monospace" text-anchor="middle">37 찾기 · 회색=버린 범위</text>`;
     document.getElementById('s1').innerHTML=DB.svg(W,H,s,'이진탐색');
-    document.getElementById('lab1').innerHTML = st.found?`<b style="color:var(--good)">찾음!</b> 16개를 ${rec.frames.indexOf(fr)+1}번 만에 — 풀스캔이면 7번째라 7번 읽을 걸, 절반씩 줄여 빠르게.`:'가운데를 보고 절반을 버리는 중…';
+    document.getElementById('lab1').innerHTML = st.found?`<b style="color:var(--good)">찾음!</b> 16개를 ${rec.frames.indexOf(fr)+1}번 만에 — 풀 스캔이면 7번째라 7번 읽을 걸, 절반씩 줄여 빠르게.`:'가운데를 보고 절반을 버리는 중…';
   }
   VZ.AL.transport('#bs-ctl', rec.frames, render, {interval:900});
 })();
